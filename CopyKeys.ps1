@@ -1,4 +1,4 @@
-### +--------------------------------------------------------------
+### ---------------------------------------------------------------
 ### <script name=CopyKeys>
 ### <summary>
 ### This script copies the disk encryption keys and key encryption
@@ -7,17 +7,80 @@
 ### the keys to enable replication for these VMs to another region.
 ### </summary>
 ###
+### <param name="FilePath">Optional parameter defining the location of the output file.</param>
 ### <param name="Verbose">Optional parameter to enable verbose logging messages.</param>
 ### ---------------------------------------------------------------
 
 [CmdletBinding()]
-param()
+param(
+    [Parameter(Mandatory = $false,
+               HelpMessage="Location of the output file.")]
+    [string]$FilePath = $null)
 
 ### Checking for module versions and assemblies.
 #Requires -Modules @{ ModuleName="AzureRM"; ModuleVersion="6.8.1" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
+
+### <summary>
+###  Basic class to write output.
+### </summary>
+class OutLogger
+{
+    ### <summary>
+    ###  Gets the output file name.
+    ### </summary>
+    [string]$FileName
+
+    ### <summary>
+    ###  Gets the output file location.
+    ### </summary>
+    [string]$FilePath
+
+    ### <summary>
+    ###  Initializing file name and path.
+    ### </summary>
+    OutLogger([String]$Name, [string]$Path)
+    {
+        $this.FileName = $Name
+        $this.FilePath = $Path
+    }
+
+    ### <summary>
+    ###  Gets the full file path.
+    ### </summary>
+    [String] GetFullPath()
+    {
+        $Path = $this.FileName + '.txt'
+
+        if($this.FilePath)
+        {
+            if (-not (Test-Path $this.FilePath))
+            {
+                Write-Warning "Invalid file path: $($this.FilePath)"
+                return $Path
+            }
+
+            if ($this.FilePath[-1] -ne "\")
+            {
+                $this.FilePath = $this.FilePath + "\"
+            }
+
+            $Path = $this.FilePath + $Path
+        }
+
+        return $Path
+    }
+
+    ### <summary>
+    ###  Appends a line to the output file.
+    ### </summary>
+    [Void] WriteLine([string]$Line)
+    {
+        Out-File -FilePath $($this.GetFullPath()) -InputObject $Line -Append -NoClobber
+    }
+}
 
 ### <summary>
 ### Displays messages when cursor hovers over UI objects.
@@ -802,12 +865,15 @@ function Conduct-SourceKeyVaultPreReq(
 ### <param name="ContentType">Type of secret to be created - Wrapped BEK or BEK.</param>
 function Create-Secret(
     $Secret,
-    [string]$ContentType)
+    [string]$ContentType,
+    [OutLogger]$Logger)
 {
-    Write-Host 'Copying "Disk Encryption Key" for' "$VmName" -ForegroundColor Green
     $SecureSecret = ConvertTo-SecureString $Secret -AsPlainText -Force
-    $SuppressOutput = Set-AzureKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
+    $OutputSecret = Set-AzureKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
         $SecureSecret -tags $BekTags -ContentType $ContentType
+    Write-Host 'Copying "Disk Encryption Key" for' "$VmName" -ForegroundColor Green
+    $Logger.WriteLine("TargetBEKVault: $TargetBekVault")
+    $Logger.WriteLine("TargetBEKId: $($OutputSecret.Id)")
 }
 
 ### <summary>
@@ -816,7 +882,9 @@ function Create-Secret(
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
 function Start-CopyKeys
 {
-    $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
+    # $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
+
+    $Logger = [OutLogger]::new('CopyKeys-' + $StartTime, $FilePath)
 
     $CompletedList = @()
     $UserInputs = New-Object System.Collections.Hashtable
@@ -843,11 +911,16 @@ function Start-CopyKeys
     $FirstBekVault = $FirstKekVault = $null
     $IsBekKeyVaultNew = $IsKekKeyVaultNew = $false
 
+    $Logger.WriteLine("SubscriptionId: $($Context.Subscription.Id)")
+    $Logger.WriteLine("ResourceGroupName: $ResourceGroupName")
+    $Logger.WriteLine("TargetLocation: $TargetLocation")
+
     foreach($VmName in $VmNameArray)
     {
         try
         {
             $Vm = Get-AzureRmVM -Name $VmName -ResourceGroupName $ResourceGroupName
+            $Logger.WriteLine("`nVMName: $VmName")
 
             $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
             $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
@@ -860,6 +933,9 @@ function Start-CopyKeys
 
             $BekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Bek -SourcePermissions `
                 $SourceSecretsPermissions -Secret
+
+            $Logger.WriteLine("SourceBEKVault: $($BekKeyVaultResource.Name)")
+            $Logger.WriteLine("SourceBEKId: $($Bek.SecretUrl)")
 
             if ($IsFirstBekVault)
             {
@@ -881,6 +957,9 @@ function Start-CopyKeys
             {
                 $KekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Kek `
                     -SourcePermissions $SourceKeysPermissions
+
+                $Logger.WriteLine("SourceKEKVault: $($KekKeyVaultResource.Name)")
+                $Logger.WriteLine("SourceKEKId: $($Kek.KeyUrl)")
 
                 if ($IsFirstKekVault)
                 {
@@ -922,6 +1001,9 @@ function Start-CopyKeys
                     Write-Host "Using existing key $($KekKey.Name)" -ForegroundColor Green
                 }
 
+                $Logger.WriteLine("TargetKEKVault: $TargetKekVault")
+                $Logger.WriteLine("TargetKEKId: $($NewKekKey.Id)")
+
                 $TargetKekUri = "https://" + "$TargetKekVault" + ".vault.azure.net/keys/" + $NewKekKey.Name + '/' + `
                     $NewKekKey.Version
 
@@ -934,12 +1016,11 @@ function Start-CopyKeys
                     $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $TargetKekUri
 
                 $BekTags.DiskEncryptionKeyEncryptionKeyURL = $TargetKekUri
-                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"
-
+                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"  -Logger $Logger
             }
             else
             {
-                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK"
+                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK" -Logger $Logger
             }
 
             $CompletedList += $VmName
@@ -980,9 +1061,11 @@ $TargetKeysPermissions = @('get', 'create', 'encrypt')
 
 try
 {
-    Write-Verbose "$(Get-Date -Format 'dd/mm/yyyy HH:mm:ss:fff') - CopyKeys started"
+    $StartTime = Get-Date -Format 'dd-MM-yyyy-HH-mm-ss-fff'
+    Write-Verbose "$StartTime - CopyKeys started"
     $CompletedList = @()
     $IncompleteList = New-Object System.Collections.Hashtable
+
     $CompletedList = Start-CopyKeys
 }
 catch
@@ -1015,5 +1098,5 @@ finally
             $IncompleteList[$_].CategoryInfo.Category + ": " + $IncompleteList[$_].CategoryInfo.Activity + ", " + `
             $IncompleteList[$_].CategoryInfo.Reason)
     }
-    Write-Verbose "$(Get-Date -Format 'dd/mm/yyyy HH:mm:ss:fff') - CopyKeys completed"
+    Write-Verbose "$(Get-Date -Format 'dd/MM/yyyy HH:mm:ss:fff') - CopyKeys completed"
 }
