@@ -882,7 +882,7 @@ function Create-Secret(
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
 function Start-CopyKeys
 {
-    # $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
+    $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
 
     $Logger = [OutLogger]::new('CopyKeys-' + $StartTime, $FilePath)
 
