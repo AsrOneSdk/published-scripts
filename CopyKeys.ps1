@@ -892,7 +892,7 @@ function Start-CopyKeys
                         # In case of new target key vault, initially encrypt and create permissions are given
                         # which are then updated with all actual permissions during Copy-AccessPolicies
                         Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKekVault -UserPrincipalName $UserPrincipalName `
-                            -PermissionsToKeys 'Encrypt','Create'
+                            -PermissionsToKeys 'Encrypt','Create','Get'
                     }
 
                     $FirstKekVault = $KekKeyVaultResource
@@ -902,13 +902,25 @@ function Start-CopyKeys
                 $BekEncryptionAlgorithm = $BekSecret.Attributes.Tags.DiskEncryptionKeyEncryptionAlgorithm
                 $AccessToken = Get-AccessToken
 
-                # Creating the new KEK
                 [uri]$Url = $Kek.KeyUrl
                 $KekKey = Get-AzureKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
                     -Name $Url.Segments[2].TrimEnd("/")
-                $NewKekKey = Add-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name -Destination Software
 
-                Write-Host 'Copying "Key Encryption Key" for' "$VmName" -ForegroundColor Green
+                $NewKekKey = Get-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                    -ErrorAction SilentlyContinue
+
+                if (-not $NewKekKey)
+                {
+                    # Creating the new KEK
+                    $NewKekKey = Add-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                        -Destination Software
+                    Write-Host 'Copying "Key Encryption Key" for' "$VmName" -ForegroundColor Green
+                }
+                else
+                {
+                    # Using existing KEK
+                    Write-Host "Using existing key $($KekKey.Name)" -ForegroundColor Green
+                }
 
                 $TargetKekUri = "https://" + "$TargetKekVault" + ".vault.azure.net/keys/" + $NewKekKey.Name + '/' + `
                     $NewKekKey.Version
@@ -964,7 +976,7 @@ $ErrorActionPreference = "Stop"
 $SourceSecretsPermissions = @('get')
 $TargetSecretsPermissions = @('set')
 $SourceKeysPermissions = @('get', 'decrypt')
-$TargetKeysPermissions = @('create', 'encrypt')
+$TargetKeysPermissions = @('get', 'create', 'encrypt')
 
 try
 {
