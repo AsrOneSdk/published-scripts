@@ -8,6 +8,7 @@
 ### </summary>
 ###
 ### <param name="FilePath">Optional parameter defining the location of the output file.</param>
+### <param name="ForceDebug">Optional parameter forcing debug output without any prompts.</param>
 ### <param name="Verbose">Optional parameter to enable verbose logging messages.</param>
 ### ---------------------------------------------------------------
 
@@ -15,7 +16,11 @@
 param(
     [Parameter(Mandatory = $false,
                HelpMessage="Location of the output file.")]
-    [string]$FilePath = $null)
+    [string]$FilePath = $null,
+
+    [Parameter(Mandatory = $false,
+               HelpMessage="Forces debug output without any prompts.")]
+    [switch]$ForceDebug)
 
 ### Checking for module versions and assemblies.
 #Requires -Modules @{ ModuleName="AzureRM"; ModuleVersion="6.8.1" }
@@ -26,7 +31,7 @@ Add-Type -AssemblyName System.Windows.Forms
 ### <summary>
 ###  Basic class to write output.
 ### </summary>
-class OutLogger
+class Logger
 {
     ### <summary>
     ###  Gets the output file name.
@@ -37,11 +42,12 @@ class OutLogger
     ###  Gets the output file location.
     ### </summary>
     [string]$FilePath
-
     ### <summary>
-    ###  Initializing file name and path.
+    ###  Initializes an instance of class OutLogger.
     ### </summary>
-    OutLogger([String]$Name, [string]$Path)
+    ### <param name="Name">Name of the file.</param>
+    ### <param name="Path">Local or absolute path to the file.</param>
+    Logger([String]$Name, [string]$Path)
     {
         $this.FileName = $Name
         $this.FilePath = $Path
@@ -52,7 +58,7 @@ class OutLogger
     ### </summary>
     [String] GetFullPath()
     {
-        $Path = $this.FileName + '.txt'
+        $Path = $this.FileName + '.log'
 
         if($this.FilePath)
         {
@@ -76,6 +82,7 @@ class OutLogger
     ### <summary>
     ###  Appends a line to the output file.
     ### </summary>
+    ### <param name="Line">String to be appended to the file.</param>
     [Void] WriteLine([string]$Line)
     {
         Out-File -FilePath $($this.GetFullPath()) -InputObject $Line -Append -NoClobber
@@ -866,7 +873,7 @@ function Conduct-SourceKeyVaultPreReq(
 function Create-Secret(
     $Secret,
     [string]$ContentType,
-    [OutLogger]$Logger)
+    [Logger]$Logger)
 {
     $SecureSecret = ConvertTo-SecureString $Secret -AsPlainText -Force
     $OutputSecret = Set-AzureKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
@@ -884,12 +891,17 @@ function Start-CopyKeys
 {
     $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
 
-    $Logger = [OutLogger]::new('CopyKeys-' + $StartTime, $FilePath)
+    $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
 
     $CompletedList = @()
     $UserInputs = New-Object System.Collections.Hashtable
     Write-Verbose "Starting user interface to get inputs"
     Generate-UserInterface
+
+    if ($ForceDebug)
+    {
+        $Script:DebugPreference = "Continue"
+    }
 
     $ResourceGroupName = $UserInputs["ResourceGroupName"]
     $VmNameArray = $UserInputs["VmNameArray"]
@@ -911,16 +923,16 @@ function Start-CopyKeys
     $FirstBekVault = $FirstKekVault = $null
     $IsBekKeyVaultNew = $IsKekKeyVaultNew = $false
 
-    $Logger.WriteLine("SubscriptionId: $($Context.Subscription.Id)")
-    $Logger.WriteLine("ResourceGroupName: $ResourceGroupName")
-    $Logger.WriteLine("TargetLocation: $TargetLocation")
+    $OutputLogger.WriteLine("SubscriptionId: $($Context.Subscription.Id)")
+    $OutputLogger.WriteLine("ResourceGroupName: $ResourceGroupName")
+    $OutputLogger.WriteLine("TargetLocation: $TargetLocation")
 
     foreach($VmName in $VmNameArray)
     {
         try
         {
             $Vm = Get-AzureRmVM -Name $VmName -ResourceGroupName $ResourceGroupName
-            $Logger.WriteLine("`nVMName: $VmName")
+            $OutputLogger.WriteLine("`nVMName: $VmName")
 
             $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
             $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
@@ -934,8 +946,8 @@ function Start-CopyKeys
             $BekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Bek -SourcePermissions `
                 $SourceSecretsPermissions -Secret
 
-            $Logger.WriteLine("SourceBEKVault: $($BekKeyVaultResource.Name)")
-            $Logger.WriteLine("SourceBEKId: $($Bek.SecretUrl)")
+            $OutputLogger.WriteLine("SourceBEKVault: $($BekKeyVaultResource.Name)")
+            $OutputLogger.WriteLine("SourceBEKId: $($Bek.SecretUrl)")
 
             if ($IsFirstBekVault)
             {
@@ -958,8 +970,8 @@ function Start-CopyKeys
                 $KekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Kek `
                     -SourcePermissions $SourceKeysPermissions
 
-                $Logger.WriteLine("SourceKEKVault: $($KekKeyVaultResource.Name)")
-                $Logger.WriteLine("SourceKEKId: $($Kek.KeyUrl)")
+                $OutputLogger.WriteLine("SourceKEKVault: $($KekKeyVaultResource.Name)")
+                $OutputLogger.WriteLine("SourceKEKId: $($Kek.KeyUrl)")
 
                 if ($IsFirstKekVault)
                 {
@@ -985,6 +997,12 @@ function Start-CopyKeys
                 $KekKey = Get-AzureKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
                     -Name $Url.Segments[2].TrimEnd("/")
 
+                if(-not $Kekkey)
+                {
+                    throw "Key with name: $($Url.Segments[2].TrimEnd("/"))" + `
+                        "and version: $($Url.Segments[3]) could not be found in key vault $($KekKeyVaultResource.Name)"
+                }
+
                 $NewKekKey = Get-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                     -ErrorAction SilentlyContinue
 
@@ -1001,8 +1019,8 @@ function Start-CopyKeys
                     Write-Host "Using existing key $($KekKey.Name)" -ForegroundColor Green
                 }
 
-                $Logger.WriteLine("TargetKEKVault: $TargetKekVault")
-                $Logger.WriteLine("TargetKEKId: $($NewKekKey.Id)")
+                $OutputLogger.WriteLine("TargetKEKVault: $TargetKekVault")
+                $OutputLogger.WriteLine("TargetKEKId: $($NewKekKey.Id)")
 
                 $TargetKekUri = "https://" + "$TargetKekVault" + ".vault.azure.net/keys/" + $NewKekKey.Name + '/' + `
                     $NewKekKey.Version
@@ -1016,11 +1034,11 @@ function Start-CopyKeys
                     $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $TargetKekUri
 
                 $BekTags.DiskEncryptionKeyEncryptionKeyURL = $TargetKekUri
-                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"  -Logger $Logger
+                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"  -Logger $OutputLogger
             }
             else
             {
-                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK" -Logger $Logger
+                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK" -Logger $OutputLogger
             }
 
             $CompletedList += $VmName
@@ -1066,18 +1084,32 @@ try
     $CompletedList = @()
     $IncompleteList = New-Object System.Collections.Hashtable
 
-    $CompletedList = Start-CopyKeys
+    if ($ForceDebug)
+    {
+        $Script:DebugPreference = "SilentlyContinue"
+        $DebugLogger = [Logger]::new('CopyKeysDebug-' + $StartTime, $FilePath)
+        $CompletedList = Start-CopyKeys 5> $DebugLogger.GetFullPath()
+    }
+    else
+    {
+        $CompletedList = Start-CopyKeys
+    }
 }
 catch
 {
-    Write-Host -ForegroundColor Red -BackgroundColor Black ("`nException: " + $PSItem.Exception.Message)
-    Write-Host -ForegroundColor Red -BackgroundColor Black ("At: " + $PSItem.InvocationInfo.Line.Trim())
-    Write-Host -ForegroundColor Red -BackgroundColor Black ("Line: " + $PSItem.InvocationInfo.ScriptLineNumber + `
-        "; Char:" + $PSItem.InvocationInfo.OffsetInLine + "`n" + "StackTrace: `n" + $PSItem.ScriptStackTrace)
-    Write-Host -ForegroundColor Red -BackgroundColor Black ("CategoryInfo: " + $PSItem.CategoryInfo.Category + ": " + `
-        $PSItem.CategoryInfo.Activity + ", " + $PSItem.CategoryInfo.Reason)
-    Write-Host -ForegroundColor Red -BackgroundColor Black ("An unknown exception occurred. Please contact " + `
-        "support with the error details")
+    $UnknownError = "`nException: " + $PSItem.Exception.Message + `
+        "`nAt: " + $PSItem.InvocationInfo.Line.Trim() + `
+        "Line: " + $PSItem.InvocationInfo.ScriptLineNumber + "; Char:" + $PSItem.InvocationInfo.OffsetInLine + `
+        "`nStackTrace: `n" + $PSItem.ScriptStackTrace + `
+        "`nCategoryInfo: " + $PSItem.CategoryInfo.Category + ": " + $PSItem.CategoryInfo.Activity + ", " + `
+            $PSItem.CategoryInfo.Reason + `
+        "`nAn unknown exception occurred. Please contact support with the error details"
+    Write-Host -ForegroundColor Red -BackgroundColor Black $UnknownError
+
+    if($DebugLogger -ne $null)
+    {
+        $DebugLogger.WriteLine("`nERROR: " + $UnknownError)
+    }
 }
 finally
 {
@@ -1088,15 +1120,21 @@ finally
     }
     $IncompleteList.Keys | % {
         Write-Host -ForegroundColor Green "`nCopyKeys failed for $_ with"
-        Write-Host -ForegroundColor Red -BackgroundColor Black ("Exception: " + $IncompleteList[$_].Exception.Message)
-        Write-Host -ForegroundColor Red -BackgroundColor Black ("At: " + $IncompleteList[$_].InvocationInfo.Line.Trim())
-        Write-Host -ForegroundColor Red -BackgroundColor Black ("Line: " + `
-            $IncompleteList[$_].InvocationInfo.ScriptLineNumber + "; Char:" + `
-            $IncompleteList[$_].InvocationInfo.OffsetInLine + "`n" + "StackTrace: `n" + `
-            $IncompleteList[$_].ScriptStackTrace)
-        Write-Host -ForegroundColor Red -BackgroundColor Black ("CategoryInfo: " + `
-            $IncompleteList[$_].CategoryInfo.Category + ": " + $IncompleteList[$_].CategoryInfo.Activity + ", " + `
-            $IncompleteList[$_].CategoryInfo.Reason)
+        $KnownError = "Exception: " + $IncompleteList[$_].Exception.Message + `
+        "`nAt: " + $IncompleteList[$_].InvocationInfo.Line.Trim() + `
+        "Line: " + $IncompleteList[$_].InvocationInfo.ScriptLineNumber + "; Char:" + `
+            $IncompleteList[$_].InvocationInfo.OffsetInLine + `
+        "`nStackTrace: `n" + $IncompleteList[$_].ScriptStackTrace + `
+        "`nCategoryInfo: " + $IncompleteList[$_].CategoryInfo.Category + ": " + `
+            $IncompleteList[$_].CategoryInfo.Activity + ", " + $IncompleteList[$_].CategoryInfo.Reason
+        Write-Host -ForegroundColor Red -BackgroundColor Black $KnownError
+
+        if($DebugLogger -ne $null)
+        {
+            $DebugLogger.WriteLine("`nCopyKeys failed for $_ with" + "`nERROR: " + $KnownError)
+        }
+
     }
+
     Write-Verbose "$(Get-Date -Format 'dd/MM/yyyy HH:mm:ss:fff') - CopyKeys completed"
 }
