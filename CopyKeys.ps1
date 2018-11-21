@@ -538,9 +538,9 @@ function Generate-UserInterface
 }
 
 ### <summary>
-### Gets the access token to key vaults.
+### Gets the authentication result to key vaults.
 ### </summary>
-function Get-AccessToken
+function Get-Authentication
 {
     # Vault resources endpoint
     $ArmResource = "https://vault.azure.net"
@@ -551,7 +551,8 @@ function Get-AccessToken
     $AuthContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" `
         -ArgumentList $AuthorityUri
     $AuthResult = $AuthContext.AcquireToken($ArmResource, $ClientId, $RedirectUri, "Auto")
-    return $AuthResult.AccessToken
+
+    return $AuthResult
 }
 
 ### <summary>
@@ -838,7 +839,7 @@ function Conduct-TargetKeyVaultPreReq(
         if($Secret -or (-not $IsBekKeyVaultNew) -or ($TargetBekVault -ne $TargetKeyVaultName))
         {
             # Checking whether user has required permissions to the Target Key vault
-            Compare-Permissions -KeyVaultName $TargetKeyVault.VaultName-PermissionsRequired $TargetPermissions `
+            Compare-Permissions -KeyVaultName $TargetKeyVault.VaultName -PermissionsRequired $TargetPermissions `
             -AccessPolicies $TargetKeyVault.AccessPolicies
         }
     }
@@ -915,9 +916,11 @@ function Start-CopyKeys
     Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
 
     $TenantId = $Context.Tenant.Id
-    $UserPrincipalName = $Context.Account.Id
-    $UserId = (Get-AzureRmADUser -UserPrincipalName $UserPrincipalName).Id
+    $AuthResult = Get-Authentication
+    $AccessToken = $AuthResult.AccessToken
+    $UserId = $AuthResult.UserInfo.UniqueId
 
+    Write-Debug "`nStarting CopyKeys for UserId: $UserId`n"
 
     $IsFirstBekVault = $IsFirstKekVault = $true
     $FirstBekVault = $FirstKekVault = $null
@@ -982,7 +985,7 @@ function Start-CopyKeys
                     {
                         # In case of new target key vault, initially encrypt and create permissions are given
                         # which are then updated with all actual permissions during Copy-AccessPolicies
-                        Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKekVault -UserPrincipalName $UserPrincipalName `
+                        Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
                             -PermissionsToKeys 'Encrypt','Create','Get'
                     }
 
@@ -991,7 +994,6 @@ function Start-CopyKeys
                 }
 
                 $BekEncryptionAlgorithm = $BekSecret.Attributes.Tags.DiskEncryptionKeyEncryptionAlgorithm
-                $AccessToken = Get-AccessToken
 
                 [uri]$Url = $Kek.KeyUrl
                 $KekKey = Get-AzureKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
@@ -1045,7 +1047,7 @@ function Start-CopyKeys
         }
         catch
         {
-            Write-Warning "`nCopyKeys not completed for $VmName"
+            Write-Warning "CopyKeys not completed for $VmName`n"
             $IncompleteList[$VmName] = $_
         }
     }
@@ -1082,6 +1084,7 @@ try
     $StartTime = Get-Date -Format 'dd-MM-yyyy-HH-mm-ss-fff'
     Write-Verbose "$StartTime - CopyKeys started"
     $CompletedList = @()
+    $DebugLogger = $null
     $IncompleteList = New-Object System.Collections.Hashtable
 
     if ($ForceDebug)
@@ -1117,6 +1120,11 @@ finally
     if($CompletedList.Count -gt 0)
     {
         Write-Host -ForegroundColor Green "`nCopyKeys succeeded for VMs - $($CompletedList -join ', ')."
+
+        if($DebugLogger -ne $null)
+        {
+            $DebugLogger.WriteLine("`nCopyKeys succeeded for VMs - $($CompletedList -join ', ').")
+        }
     }
     $IncompleteList.Keys | % {
         Write-Host -ForegroundColor Green "`nCopyKeys failed for $_ with"
