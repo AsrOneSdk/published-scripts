@@ -23,7 +23,8 @@ param(
     [switch]$ForceDebug)
 
 ### Checking for module versions and assemblies.
-#Requires -Modules @{ ModuleName="AzureRM"; ModuleVersion="6.8.1" }
+Import-Module AZ
+#Requires -Modules @{ ModuleName="Az"; ModuleVersion="1.8.0" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -107,8 +108,8 @@ function Get-ResourceGroups
     {
         $LoadingLabel.Text = "Loading resource groups"
 
-        Select-AzureRmSubscription -SubscriptionName $SubscriptionName
-        $ResourceProvider = Get-AzureRmResourceProvider -ProviderNamespace Microsoft.Compute
+        Select-AzSubscription -SubscriptionName $SubscriptionName
+        $ResourceProvider = Get-AzResourceProvider -ProviderNamespace Microsoft.Compute
 
         # Locations taken from resource type: availabilitySets instead of resource type: Virtual machines,
         # just to stay in parallel with the Portal.
@@ -124,7 +125,7 @@ function Get-ResourceGroups
         $LocationDropDown.Items.Clear()
         $ResourceGroupDropDown.Text = ""
 
-        [array]$ResourceGroupArray = (Get-AzureRmResourceGroup).ResourceGroupName | sort
+        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | sort
 
         foreach ($Item in $ResourceGroupArray)
         {
@@ -176,11 +177,12 @@ function Get-VirtualMachines
         $LocationDropDown.Enabled = $true
         $LocationDropDown.Text = ""
 
-        $VmList = (Get-AzureRmVm -ResourceGroupName $ResourceGroupName) | sort Name
+        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | sort Name
 
         foreach ($Item in $VmList)
         {
-            if ($Item.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq "True")
+            #if ($Item.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq "True")
+            if ((Get-AzVmDiskEncryptionStatus -ResourceGroupName $ResourceGroupName -VMName $item.Name).OsVolumeEncrypted -eq "Encrypted")
             {
                 $SuppressOutput = $VmListBox.Items.Add($Item.Name)
             }
@@ -251,7 +253,7 @@ function Get-KeyVaults
 
             while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
             {
-                $Vm = Get-AzureRmVM -ResourceGroupName `
+                $Vm = Get-AzVM -ResourceGroupName `
                 $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
 
                 if (-not $Bek)
@@ -272,7 +274,7 @@ function Get-KeyVaults
             else
             {
                 $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $BekKeyVault = Get-AzureRmResource -Name $BekKeyVaultName
+                $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
 
                 if (-not $BekKeyVault)
                 {
@@ -294,7 +296,7 @@ function Get-KeyVaults
             else
             {
                 $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $KekKeyVault = Get-AzureRmResource -Name $KekKeyVaultName
+                $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
 
                 if (-not $KekKeyVault)
                 {
@@ -309,7 +311,7 @@ function Get-KeyVaults
             {
                 if ($BekDropDown.Items.Count -le 1)
                 {
-                    $KeyVaultList = (Get-AzureRmKeyVault).VaultName | sort
+                    $KeyVaultList = (Get-AzKeyVault).VaultName | sort
 
                     foreach ($Item in $KeyVaultList)
                     {
@@ -521,7 +523,7 @@ function Generate-UserInterface
 
     # Populating the subscription dropdown and launching the form
 
-    [array]$SubscriptionArray = ((Get-AzureRmSubscription).Name | sort)
+    [array]$SubscriptionArray = ((Get-AzSubscription).Name | sort)
 
     foreach ($Item in $SubscriptionArray)
     {
@@ -664,7 +666,7 @@ function Copy-AccessPolicies(
 
     foreach ($AccessPolicy in $SourceAccessPolicies)
     {
-        $SetPolicyCommand = "Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKeyVaultName" + `
+        $SetPolicyCommand = "Set-AzKeyVaultAccessPolicy -VaultName $TargetKeyVaultName" + `
         " -ResourceGroupName $TargetResourceGroupName -ObjectId $($AccessPolicy.ObjectId)" + ' '
 
         if ($AccessPolicy.Permissions.Keys)
@@ -794,7 +796,7 @@ function Conduct-TargetKeyVaultPreReq(
 {
     try
     {
-        $TargetKeyVault = Get-AzureRmKeyVault -VaultName $TargetKeyVaultName
+        $TargetKeyVault = Get-AzKeyVault -VaultName $TargetKeyVaultName
     }
     catch
     {
@@ -807,12 +809,12 @@ function Conduct-TargetKeyVaultPreReq(
         $IsKeyVaultNew.Value = $true
         Write-Host "Creating key vault $TargetKeyVaultName" -ForegroundColor Green
 
-        $KeyVaultResource = Get-AzureRmResource -ResourceId $EncryptionKey.SourceVault.Id
+        $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
         $TargetResourceGroupName = "$($KeyVaultResource.ResourceGroupName)" + "-asr"
 
         try
         {
-            $TargetResourceGroup = Get-AzureRmResourceGroup -Name $TargetResourceGroupName
+            $TargetResourceGroup = Get-AzResourceGroup -Name $TargetResourceGroupName
         }
         catch
         {
@@ -822,10 +824,10 @@ function Conduct-TargetKeyVaultPreReq(
 
         if (-not $TargetResourceGroup)
         {
-            New-AzureRmResourceGroup -Name $TargetResourceGroupName -Location $TargetLocation
+            New-AzResourceGroup -Name $TargetResourceGroupName -Location $TargetLocation
         }
 
-        $SuppressOutput = New-AzureRmKeyVault -VaultName $TargetKeyVaultName -ResourceGroupName `
+        $SuppressOutput = New-AzKeyVault -VaultName $TargetKeyVaultName -ResourceGroupName `
             $TargetResourceGroupName -Location $TargetLocation `
             -EnabledForDeployment:$KeyVaultResource.Properties.EnabledForDeployment `
             -EnabledForTemplateDeployment:$KeyVaultResource.Properties.EnabledForTemplateDeployment `
@@ -857,7 +859,7 @@ function Conduct-SourceKeyVaultPreReq(
     $EncryptionKey,
     $SourcePermissions)
 {
-    $KeyVaultResource = Get-AzureRmResource -ResourceId $EncryptionKey.SourceVault.Id
+    $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
 
     # Checking whether user has required permissions to the Source Key vault
     Compare-Permissions -KeyVaultName $KeyVaultResource.Name -PermissionsRequired $SourcePermissions `
@@ -877,7 +879,7 @@ function Create-Secret(
     [Logger]$Logger)
 {
     $SecureSecret = ConvertTo-SecureString $Secret -AsPlainText -Force
-    $OutputSecret = Set-AzureKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
+    $OutputSecret = Set-AzKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
         $SecureSecret -tags $BekTags -ContentType $ContentType
     Write-Host 'Copying "Disk Encryption Key" for' "$VmName" -ForegroundColor Green
     $Logger.WriteLine("TargetBEKVault: $TargetBekVault")
@@ -890,7 +892,7 @@ function Create-Secret(
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
 function Start-CopyKeys
 {
-    $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
+    $SuppressOutput = connect-AzAccount -ErrorAction Stop
 
     $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
 
@@ -910,7 +912,7 @@ function Start-CopyKeys
     $TargetBekVault = $UserInputs["TargetBekVault"]
     $TargetKekVault = $UserInputs["TargetKekVault"]
 
-    $Context = Get-AzureRmContext
+    $Context = Get-AzContext
 
     Write-Verbose "`nSubscription Id: $($Context.Subscription.Id)"
     Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
@@ -934,7 +936,7 @@ function Start-CopyKeys
     {
         try
         {
-            $Vm = Get-AzureRmVM -Name $VmName -ResourceGroupName $ResourceGroupName
+            $Vm = Get-AzVM -Name $VmName -ResourceGroupName $ResourceGroupName
             $OutputLogger.WriteLine("`nVMName: $VmName")
 
             $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
@@ -963,7 +965,7 @@ function Start-CopyKeys
 
             # Getting the BEK secret value text.
             [uri]$Url = $Bek.SecretUrl
-            $BekSecret = Get-AzureKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
+            $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
                 -Name $Url.Segments[2].TrimEnd("/")
             $BekSecretBase64 = $BekSecret.SecretValueText
             $BekTags = $BekSecret.Attributes.Tags
@@ -985,7 +987,7 @@ function Start-CopyKeys
                     {
                         # In case of new target key vault, initially encrypt and create permissions are given
                         # which are then updated with all actual permissions during Copy-AccessPolicies
-                        Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
+                        Set-AzKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
                             -PermissionsToKeys 'Encrypt','Create','Get'
                     }
 
@@ -996,7 +998,7 @@ function Start-CopyKeys
                 $BekEncryptionAlgorithm = $BekSecret.Attributes.Tags.DiskEncryptionKeyEncryptionAlgorithm
 
                 [uri]$Url = $Kek.KeyUrl
-                $KekKey = Get-AzureKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
+                $KekKey = Get-AzKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
                     -Name $Url.Segments[2].TrimEnd("/")
 
                 if(-not $Kekkey)
@@ -1005,13 +1007,13 @@ function Start-CopyKeys
                         "and version: $($Url.Segments[3]) could not be found in key vault $($KekKeyVaultResource.Name)"
                 }
 
-                $NewKekKey = Get-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                $NewKekKey = Get-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                     -ErrorAction SilentlyContinue
 
                 if (-not $NewKekKey)
                 {
                     # Creating the new KEK
-                    $NewKekKey = Add-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                    $NewKekKey = Add-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                         -Destination Software
                     Write-Host 'Copying "Key Encryption Key" for' "$VmName" -ForegroundColor Green
                 }
