@@ -24,7 +24,6 @@ param(
 
 ### Checking for module versions and assemblies.
 Import-Module AZ
-#Requires -Modules @{ ModuleName="Az"; ModuleVersion="1.8.0" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -911,7 +910,10 @@ function Start-CopyKeys
     $TargetBekVault = $UserInputs["TargetBekVault"]
     $TargetKekVault = $UserInputs["TargetKekVault"]
 
-    $Context = Get-AzContext
+    if($Context -eq $null)
+      {
+        $Context = Get-AzContext
+      }
 
     Write-Verbose "`nSubscription Id: $($Context.Subscription.Id)"
     Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
