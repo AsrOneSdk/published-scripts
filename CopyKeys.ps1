@@ -181,8 +181,7 @@ function Get-VirtualMachines
 
         foreach ($Item in $VmList)
         {
-            #if ($Item.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq "True")
-            if ((Get-AzVmDiskEncryptionStatus -ResourceGroupName $ResourceGroupName -VMName $item.Name).OsVolumeEncrypted -eq "Encrypted")
+            if ($Item.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq "True")
             {
                 $SuppressOutput = $VmListBox.Items.Add($Item.Name)
             }
