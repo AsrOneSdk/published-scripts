@@ -890,7 +890,11 @@ function Create-Secret(
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
 function Start-CopyKeys
 {
-    $SuppressOutput = connect-AzAccount -ErrorAction Stop
+    $Context = Get-AzContext
+    if($Context -eq $null)
+    {
+        $SuppressOutput = Login-AzAccount -ErrorAction Stop
+    }
 
     $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
 
