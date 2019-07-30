@@ -1213,7 +1213,7 @@ function Start-CopyKeys
             $VmName = $Source.Name
 
             # Only VMName as source name if 2 pass else VMName - DiskName
-            $SourceName = if ($Source.DiskName -eq "") { $Source.Name } else { $Source.Name + " - " $Source.DiskName }
+            $SourceName = if ($Source.DiskName -eq "") { $Source.Name } else { $Source.Name + " - " + $Source.DiskName }
 
             # If output diskName is empty -> 2-pass else 1-pass
             $OutputLogger.Log(
