@@ -23,7 +23,7 @@ param(
     [switch]$ForceDebug)
 
 ### Checking for module versions and assemblies.
-#Requires -Modules @{ ModuleName="AzureRM"; ModuleVersion="6.8.1" }
+###Requires -Modules @{ ModuleName="Az"; ModuleVersion="6.8.1" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -278,8 +278,8 @@ function Get-ResourceGroups
     {
         $LoadingLabel.Text = "Loading resource groups"
 
-        Select-AzureRmSubscription -SubscriptionName $SubscriptionName
-        $ResourceProvider = Get-AzureRmResourceProvider -ProviderNamespace Microsoft.Compute
+        Select-AzSubscription -SubscriptionName $SubscriptionName
+        $ResourceProvider = Get-AzResourceProvider -ProviderNamespace Microsoft.Compute
 
         # Locations taken from resource type: availabilitySets instead of resource type: Virtual machines,
         # just to stay in parallel with the Portal.
@@ -295,7 +295,7 @@ function Get-ResourceGroups
         $LocationDropDown.Items.Clear()
         $ResourceGroupDropDown.Text = ""
 
-        [array]$ResourceGroupArray = (Get-AzureRmResourceGroup).ResourceGroupName | sort
+        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | sort
 
         foreach ($Item in $ResourceGroupArray)
         {
@@ -347,7 +347,7 @@ function Get-VirtualMachines
         $LocationDropDown.Enabled = $true
         $LocationDropDown.Text = ""
 
-        $VmList = (Get-AzureRmVm -ResourceGroupName $ResourceGroupName) | sort Name
+        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | sort Name
 
         foreach ($Item in $VmList)
         {
@@ -423,12 +423,12 @@ function Get-KeyVaults
 
             while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
             {
-                $Vm = Get-AzureRmVM -ResourceGroupName `
+                $Vm = Get-AzVM -ResourceGroupName `
                     $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
 
                 if ($Vm.StorageProfile.OsDisk.EncryptionSettings -eq $null)
                 {
-                    $Vm = Get-AzureRmVM -ResourceGroupName `
+                    $Vm = Get-AzVM -ResourceGroupName `
                         $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index] -Status
 
                     $Disks = $Vm.Disks
@@ -471,7 +471,7 @@ function Get-KeyVaults
             else
             {
                 $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $BekKeyVault = Get-AzureRmResource -Name $BekKeyVaultName
+                $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
 
                 if (-not $BekKeyVault)
                 {
@@ -493,7 +493,7 @@ function Get-KeyVaults
             else
             {
                 $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $KekKeyVault = Get-AzureRmResource -Name $KekKeyVaultName
+                $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
 
                 if (-not $KekKeyVault)
                 {
@@ -508,7 +508,7 @@ function Get-KeyVaults
             {
                 if ($BekDropDown.Items.Count -le 1)
                 {
-                    $KeyVaultList = (Get-AzureRmKeyVault).VaultName | sort
+                    $KeyVaultList = (Get-AzKeyVault).VaultName | sort
 
                     foreach ($Item in $KeyVaultList)
                     {
@@ -720,7 +720,7 @@ function Generate-UserInterface
 
     # Populating the subscription dropdown and launching the form
 
-    [array]$SubscriptionArray = ((Get-AzureRmSubscription).Name | sort)
+    [array]$SubscriptionArray = ((Get-AzSubscription).Name | sort)
 
     foreach ($Item in $SubscriptionArray)
     {
@@ -864,11 +864,11 @@ function New-Sources {
 
     foreach($VmName in $VmArray)
     {
-        $Vm = Get-AzureRmVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
+        $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
 
         if ($Vm.StorageProfile.OsDisk.EncryptionSettings -eq $null)
         {
-            $Vm = Get-AzureRmVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
+            $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
             $Disks = $Vm.Disks
 
             for($i=0; $i -lt $Disks.Count; $i++)
@@ -923,7 +923,7 @@ function Copy-AccessPolicies(
 
     foreach ($AccessPolicy in $SourceAccessPolicies)
     {
-        $SetPolicyCommand = "Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKeyVaultName" + `
+        $SetPolicyCommand = "Set-AzKeyVaultAccessPolicy -VaultName $TargetKeyVaultName" + `
         " -ResourceGroupName $TargetResourceGroupName -ObjectId $($AccessPolicy.ObjectId)" + ' '
 
         if ($AccessPolicy.Permissions.Keys)
@@ -1053,7 +1053,7 @@ function Conduct-TargetKeyVaultPreReq(
 {
     try
     {
-        $TargetKeyVault = Get-AzureRmKeyVault -VaultName $TargetKeyVaultName
+        $TargetKeyVault = Get-AzKeyVault -VaultName $TargetKeyVaultName
     }
     catch
     {
@@ -1066,12 +1066,12 @@ function Conduct-TargetKeyVaultPreReq(
         $IsKeyVaultNew.Value = $true
         Write-Host "Creating key vault $TargetKeyVaultName" -ForegroundColor Green
 
-        $KeyVaultResource = Get-AzureRmResource -ResourceId $EncryptionKey.SourceVault.Id
+        $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
         $TargetResourceGroupName = "$($KeyVaultResource.ResourceGroupName)" + "-asr"
 
         try
         {
-            $TargetResourceGroup = Get-AzureRmResourceGroup -Name $TargetResourceGroupName
+            $TargetResourceGroup = Get-AzResourceGroup -Name $TargetResourceGroupName
         }
         catch
         {
@@ -1081,10 +1081,10 @@ function Conduct-TargetKeyVaultPreReq(
 
         if (-not $TargetResourceGroup)
         {
-            New-AzureRmResourceGroup -Name $TargetResourceGroupName -Location $TargetLocation
+            New-AzResourceGroup -Name $TargetResourceGroupName -Location $TargetLocation
         }
 
-        $SuppressOutput = New-AzureRmKeyVault -VaultName $TargetKeyVaultName -ResourceGroupName `
+        $SuppressOutput = New-AzKeyVault -VaultName $TargetKeyVaultName -ResourceGroupName `
             $TargetResourceGroupName -Location $TargetLocation `
             -EnabledForDeployment:$KeyVaultResource.Properties.EnabledForDeployment `
             -EnabledForTemplateDeployment:$KeyVaultResource.Properties.EnabledForTemplateDeployment `
@@ -1116,7 +1116,7 @@ function Conduct-SourceKeyVaultPreReq(
     $EncryptionKey,
     $SourcePermissions)
 {
-    $KeyVaultResource = Get-AzureRmResource -ResourceId $EncryptionKey.SourceVault.Id
+    $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
 
     # Checking whether user has required permissions to the Source Key vault
     Compare-Permissions -KeyVaultName $KeyVaultResource.Name -PermissionsRequired $SourcePermissions `
@@ -1155,11 +1155,11 @@ function Create-Secret(
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
 function Start-CopyKeys
 {
-    $Context = Get-AzureRmContext
+    $Context = Get-AzContext
 
     if($Context -eq $null)
     {
-        $SuppressOutput = Login-AzureRmAccount -ErrorAction Stop
+        $SuppressOutput = Login-AzAccount -ErrorAction Stop
     }
 
     $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
@@ -1183,7 +1183,7 @@ function Start-CopyKeys
 
     if($Context -eq $null)
     {
-        $Context = Get-AzureRmContext
+        $Context = Get-AzContext
     }
 
     Write-Verbose "`nSubscription Id: $($Context.Subscription.Id)"
@@ -1290,7 +1290,7 @@ function Start-CopyKeys
                     {
                         # In case of new target key vault, initially encrypt and create permissions are given
                         # which are then updated with all actual permissions during Copy-AccessPolicies
-                        Set-AzureRmKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
+                        Set-AzKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
                             -PermissionsToKeys 'Encrypt','Create','Get'
                     }
 
