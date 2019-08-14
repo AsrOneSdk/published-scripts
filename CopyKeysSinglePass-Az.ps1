@@ -283,7 +283,7 @@ function Get-ResourceGroups
 
         # Locations taken from resource type: availabilitySets instead of resource type: Virtual machines,
         # just to stay in parallel with the Portal.
-        $Locations = ($ResourceProvider[0].Locations) | % { $_.Split(' ').tolower() -join ''} | sort
+        $Locations = ($ResourceProvider[0].Locations) | ForEach-Object { $_.Split(' ').tolower() -join ''} | Sort-Object
         $ResourceGroupLabel = $FormElements["ResourceGroupLabel"]
         $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
         $VmListBox = $FormElements["VmListBox"]
@@ -295,7 +295,7 @@ function Get-ResourceGroups
         $LocationDropDown.Items.Clear()
         $ResourceGroupDropDown.Text = ""
 
-        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | sort
+        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | Sort-Object
 
         foreach ($Item in $ResourceGroupArray)
         {
@@ -304,7 +304,7 @@ function Get-ResourceGroups
 
         if($ResourceGroupArray)
         {
-            $Longest = ($ResourceGroupArray | sort Length -Descending)[0]
+            $Longest = ($ResourceGroupArray | Sort-Object Length -Descending)[0]
             $ResourceGroupDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $ResourceGroupDropDown.Font).Width, $ResourceGroupDropDown.Width | Measure-Object -Maximum).Maximum
         }
@@ -316,7 +316,7 @@ function Get-ResourceGroups
 
         if($Locations)
         {
-            $Longest = ($Locations | sort Length -Descending)[0]
+            $Longest = ($Locations | Sort-Object Length -Descending)[0]
             $LocationDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $LocationDropDown.Font).Width, $LocationDropDown.Width | Measure-Object -Maximum).Maximum
         }
@@ -347,12 +347,12 @@ function Get-VirtualMachines
         $LocationDropDown.Enabled = $true
         $LocationDropDown.Text = ""
 
-        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | sort Name
+        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | Sort-Object Name
 
         foreach ($Item in $VmList)
         {
-            if (($Item.Extensions -ne $null) -and
-                ($Item.Extensions.Id | % {$_.split('/')[-1].tolower().contains('azurediskencryption')}) -contains $true)
+            if (($null -ne $Item.Extensions) -and
+                ($Item.Extensions.Id | ForEach-Object {$_.split('/')[-1].tolower().contains('azurediskencryption')}) -contains $true)
             {
                 $SuppressOutput = $VmListBox.Items.Add($Item.Name)
             }
@@ -360,7 +360,7 @@ function Get-VirtualMachines
 
         if($VmList -and ($VmListBox.Items.Count -gt 0))
         {
-            $Longest = ($VmList.Name | sort Length -Descending)[0]
+            $Longest = ($VmList.Name | Sort-Object Length -Descending)[0]
             $Size = [System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $VmListBox.Font).Width
 
@@ -426,7 +426,7 @@ function Get-KeyVaults
                 $Vm = Get-AzVM -ResourceGroupName `
                     $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
 
-                if ($Vm.StorageProfile.OsDisk.EncryptionSettings -eq $null)
+                if ($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings)
                 {
                     $Vm = Get-AzVM -ResourceGroupName `
                         $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index] -Status
@@ -436,7 +436,7 @@ function Get-KeyVaults
 
                     foreach ($Disk in $Disks)
                     {
-                        if ($Disk.EncryptionSettings -ne $null)
+                        if ($null -ne $Disk.EncryptionSettings)
                         {
                             $IsNotEncrypted = $false
                             $Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
@@ -508,7 +508,7 @@ function Get-KeyVaults
             {
                 if ($BekDropDown.Items.Count -le 1)
                 {
-                    $KeyVaultList = (Get-AzKeyVault).VaultName | sort
+                    $KeyVaultList = (Get-AzKeyVault).VaultName | Sort-Object
 
                     foreach ($Item in $KeyVaultList)
                     {
@@ -520,14 +520,14 @@ function Get-KeyVaults
                     {
                         if($Bek)
                         {
-                            $Longest = ($KeyVaultList + $BekKeyVaultName | sort Length -Descending)[0]
+                            $Longest = ($KeyVaultList + $BekKeyVaultName | Sort-Object Length -Descending)[0]
                             $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                                 $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
                         }
 
                         if($Kek)
                         {
-                            $Longest = ($KeyVaultList + $KekKeyVaultName  | sort Length -Descending)[0]
+                            $Longest = ($KeyVaultList + $KekKeyVaultName  | Sort-Object Length -Descending)[0]
                             $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                                 $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
                         }
@@ -720,14 +720,14 @@ function Generate-UserInterface
 
     # Populating the subscription dropdown and launching the form
 
-    [array]$SubscriptionArray = ((Get-AzSubscription).Name | sort)
+    [array]$SubscriptionArray = ((Get-AzSubscription).Name | Sort-Object)
 
     foreach ($Item in $SubscriptionArray)
     {
         $SuppressOutput = $SubscriptionDropDown.Items.Add($Item)
     }
 
-    $Longest = ($SubscriptionArray | sort Length -Descending)[0]
+    $Longest = ($SubscriptionArray | Sort-Object Length -Descending)[0]
     $SubscriptionDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
         $SubscriptionDropDown.Font).Width, $SubscriptionDropDown.Width | Measure-Object -Maximum).Maximum
 
@@ -866,7 +866,7 @@ function New-Sources {
     {
         $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
 
-        if ($Vm.StorageProfile.OsDisk.EncryptionSettings -eq $null)
+        if ($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings)
         {
             $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
             $Disks = $Vm.Disks
@@ -876,7 +876,7 @@ function New-Sources {
                 $Disk = $Disks[$i]
                 $Source = [Source]::new($VmName, $Disk.Name)
 
-                if($Disks[$i].EncryptionSettings -ne $null)
+                if($null -ne $Disks[$i].EncryptionSettings)
                 {
                     $Source.Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
                     $Source.Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
@@ -998,9 +998,9 @@ function Compare-Permissions(
                     $PermissionsType = "secrets"
                 }
 
-                $Permissions = $Permissions | %{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
 
-                if (-not $Permissions -or (($PermissionsRequired | % { $Permissions.Contains($_)}) -contains $false))
+                if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
                     $ErrorString = $ErrorString1 + $PermissionsType + $ErrorString2
                     $ErrorString += $PermissionsType
@@ -1017,9 +1017,9 @@ function Compare-Permissions(
                     $PermissionsType = "secrets"
                 }
 
-                $Permissions = $Permissions | %{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
 
-                if (-not $Permissions -or (($PermissionsRequired | % { $Permissions.Contains($_)}) -contains $false))
+                if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
                     $ErrorString = $ErrorString1 + $PermissionsType + $ErrorString2
                     $ErrorString += $PermissionsType + '.'
@@ -1136,7 +1136,7 @@ function Create-Secret(
     [Logger]$Logger)
 {
     $SecureSecret = ConvertTo-SecureString $Secret -AsPlainText -Force
-    $OutputSecret = Set-AzureKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
+    $OutputSecret = Set-AzKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
         $SecureSecret -tags $BekTags -ContentType $ContentType
     Write-Host 'Copying "Disk Encryption Key" for' "$VmName" -ForegroundColor Green
     $Logger.Log(
@@ -1157,7 +1157,7 @@ function Start-CopyKeys
 {
     $Context = Get-AzContext
 
-    if($Context -eq $null)
+    if($null -eq $Context)
     {
         $SuppressOutput = Login-AzAccount -ErrorAction Stop
     }
@@ -1181,7 +1181,7 @@ function Start-CopyKeys
     $TargetKekVault = $UserInputs["TargetKekVault"]
 
 
-    if($Context -eq $null)
+    if($null -eq $Context)
     {
         $Context = Get-AzContext
     }
@@ -1262,7 +1262,7 @@ function Start-CopyKeys
 
             # Getting the BEK secret value text.
             [uri]$Url = $Bek.SecretUrl
-            $BekSecret = Get-AzureKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
+            $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
                 -Name $Url.Segments[2].TrimEnd("/")
             $BekSecretBase64 = $BekSecret.SecretValueText
             $BekTags = $BekSecret.Attributes.Tags
@@ -1301,7 +1301,7 @@ function Start-CopyKeys
                 $BekEncryptionAlgorithm = $BekSecret.Attributes.Tags.DiskEncryptionKeyEncryptionAlgorithm
 
                 [uri]$Url = $Kek.KeyUrl
-                $KekKey = Get-AzureKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
+                $KekKey = Get-AzKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
                     -Name $Url.Segments[2].TrimEnd("/")
 
                 if(-not $Kekkey)
@@ -1310,13 +1310,13 @@ function Start-CopyKeys
                         "and version: $($Url.Segments[3]) could not be found in key vault $($KekKeyVaultResource.Name)"
                 }
 
-                $NewKekKey = Get-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                $NewKekKey = Get-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                     -ErrorAction SilentlyContinue
 
                 if (-not $NewKekKey)
                 {
                     # Creating the new KEK
-                    $NewKekKey = Add-AzureKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
+                    $NewKekKey = Add-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                         -Destination Software
                     Write-Host 'Copying "Key Encryption Key" for' "$VmName" -ForegroundColor Green
                 }
@@ -1421,7 +1421,7 @@ catch
         "`nAn unknown exception occurred. Please contact support with the error details"
     Write-Host -ForegroundColor Red -BackgroundColor Black $UnknownError
 
-    if($DebugLogger -ne $null)
+    if($null -ne $DebugLogger)
     {
         $DebugLogger.Log(
             $MyInvocation,
@@ -1436,7 +1436,7 @@ finally
     {
         Write-Host -ForegroundColor Green "`nCopyKeys succeeded for VMs:`n`t$($CompletedList -join "`n`t")."
 
-        if($DebugLogger -ne $null)
+        if($null -ne $DebugLogger)
         {
             $DebugLogger.Log(
                 $MyInvocation,
@@ -1444,7 +1444,7 @@ finally
                 [LogType]::DEBUG)
         }
     }
-    $IncompleteList.Keys | % {
+    $IncompleteList.Keys | ForEach-Object {
         Write-Host -ForegroundColor Green "`nCopyKeys failed for $_ with"
         $KnownError = "Exception: " + $IncompleteList[$_].Exception.Message + `
         "`nAt: " + $IncompleteList[$_].InvocationInfo.Line.Trim() + `
