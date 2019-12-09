@@ -23,7 +23,7 @@ param(
     [switch]$ForceDebug)
 
 ### Checking for module versions and assemblies.
-### Requires -Modules @{ ModuleName="Az"; ModuleVersion="6.8.1" }
+#Requires -Modules "Az.Compute"
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
