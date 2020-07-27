@@ -24,6 +24,7 @@ param(
 
 ### Checking for module versions and assemblies.
 #Requires -Modules "Az.Compute"
+#Requires -Modules @{ ModuleName="Az.KeyVault"; ModuleVersion="2.0.0" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -1089,8 +1090,7 @@ function Conduct-TargetKeyVaultPreReq(
             -EnabledForDeployment:$KeyVaultResource.Properties.EnabledForDeployment `
             -EnabledForTemplateDeployment:$KeyVaultResource.Properties.EnabledForTemplateDeployment `
             -EnabledForDiskEncryption:$KeyVaultResource.Properties.EnabledForDiskEncryption `
-            -EnableSoftDelete:$KeyVaultResource.Properties.EnableSoftDelete -Sku $KeyVaultResource.Properties.Sku.name `
-            -Tag $KeyVaultResource.Tags
+            -Sku $KeyVaultResource.Properties.Sku.name -Tag $KeyVaultResource.Tags
     }
     else
     {
