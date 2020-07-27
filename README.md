@@ -41,6 +41,7 @@ The script copies keys and secrets for each disk - data and Os. This is because 
 Updates
 - Added logic to handle single pass VMs as well.
 - Uses the latest Azure Powershell Az modules.
+- Added restriction - Az.KeyVault >= 2.0.0
 
 | Parameters | Description |
 |--|--|
