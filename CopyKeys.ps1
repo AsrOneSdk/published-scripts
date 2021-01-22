@@ -260,7 +260,8 @@ class Logger
             $this.Log($invocationInfo, $message, $type)
         }
 
-        Out-File -FilePath $($this.GetFullPath()) -InputObject $object -Append -NoClobber
+        Out-File -FilePath $($this.GetFullPath()) -InputObject `
+            $(ConvertTo-Json -InputObject $object) -Append -NoClobber
     }
 }
 #endRegion
@@ -575,164 +576,169 @@ function Get-KeyVaults
 {
     $LocationName = $this.SelectedItem.ToString()
 
-    if ($LocationName)
+    if ([string]::IsNullOrEmpty($LocationName))
     {
-        $BekDropDown = $FormElements["BekDropDown"]
-        $KekDropDown = $FormElements["KekDropDown"]
-        $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
-        $VmSelected = $FormElements["VmListBox"].CheckedItems
-        $FailCount = 0
+        return
+    }
 
-        if ($VmSelected)
+    $BekDropDown = $FormElements["BekDropDown"]
+    $KekDropDown = $FormElements["KekDropDown"]
+    $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
+    $VmSelected = $FormElements["VmListBox"].CheckedItems
+    $FailCount = 0
+
+    if ($VmSelected)
+    {
+        $LoadingLabel.Text = [ConstantStrings]::loadingBEK
+        $Bek = $Kek = [string]::Empty
+        $Index = 0
+
+        while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
         {
-            $LoadingLabel.Text = [ConstantStrings]::loadingBEK
-            $Bek = $Kek = [string]::Empty
-            $Index = 0
+            $Vm = Get-AzVM -ResourceGroupName `
+                $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
 
-            while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
+            if (($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings) -or `
+                (-not $Vm.StorageProfile.OsDisk.EncryptionSettings.Enabled))
             {
                 $Vm = Get-AzVM -ResourceGroupName `
-                    $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
+                    $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index] -Status
 
-                if (($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings) -or `
-                    (-not $Vm.StorageProfile.OsDisk.EncryptionSettings.Enabled))
+                $Disks = $Vm.Disks
+                $IsNotEncrypted = $true
+
+                foreach ($Disk in $Disks)
                 {
-                    $Vm = Get-AzVM -ResourceGroupName `
-                        $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index] -Status
-
-                    $Disks = $Vm.Disks
-                    $IsNotEncrypted = $true
-
-                    foreach ($Disk in $Disks)
+                    if ($null -ne $Disk.EncryptionSettings)
                     {
-                        if ($null -ne $Disk.EncryptionSettings)
-                        {
-                            $IsNotEncrypted = $false
-                            $Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
-                            $Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
+                        $IsNotEncrypted = $false
+                        $Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
+                        $Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
 
-                            break
-                        }
-                    }
-
-                    if($IsNotEncrypted)
-                    {
-                        throw [Errors]::EncryptionInfoMissing($vm.Name)
+                        break
                     }
                 }
-                else
+
+                if($IsNotEncrypted)
                 {
-                    $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
-                    $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
+                    throw [Errors]::EncryptionInfoMissing($vm.Name)
                 }
-
-                $Index++
-            }
-
-            if (-not $Bek)
-            {
-                $BekDropDown.Text = [ConstantStrings]::notApplicable
-                $BekDropDown.Enabled = $false
-                $FailCount += 1
             }
             else
             {
-                $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + [ConstantStrings]::asrSuffix
-
-                if ($BekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
-                {
-                    $BekKeyVaultName =
-                        ($Bek.SourceVault.Id.Split('/')[-1]).Substring(0, 20) + `
-                        [ConstantStrings]::asrSuffix
-                }
-
-                $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
-
-                if (-not $BekKeyVault)
-                {
-                    $BekKeyVaultName = [ConstantStrings]::newPrefix + $BekKeyVaultName
-                    $BekDropDown.Items.Add($BekKeyVaultName)
-                }
-
-                $BekDropDown.Text = $BekKeyVaultName
+                $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
+                $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
             }
 
-            $LoadingLabel.Text = [ConstantStrings]::loadingKEK
+            $Index++
+        }
 
-            if (-not $Kek)
-            {
-                $KekDropDown.Text = [ConstantStrings]::notApplicable
-                $KekDropDown.Enabled = $false
-                $FailCount += 1
-            }
-            else
-            {
-                $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + [ConstantStrings]::asrSuffix
-
-                if ($KekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
-                {
-                    $KekKeyVaultName =
-                        ($Kek.SourceVault.Id.Split('/')[-1]).Substring(0, 20) + `
-                        [ConstantStrings]::asrSuffix
-                }
-
-                $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
-
-                if (-not $KekKeyVault)
-                {
-                    $KekKeyVaultName = [ConstantStrings]::newPrefix + $KekKeyVaultName
-                    $KekDropDown.Items.Add($KekKeyVaultName)
-                }
-
-                $KekDropDown.Text = $KekKeyVaultName
-            }
-
-            if ($FailCount -lt 2)
-            {
-                if ($BekDropDown.Items.Count -le 1)
-                {
-                    $KeyVaultList = (Get-AzKeyVault).VaultName | Sort-Object
-
-                    foreach ($Item in $KeyVaultList)
-                    {
-                        $SuppressOutput = $BekDropDown.Items.Add($Item)
-                        $SuppressOutput = $KekDropDown.Items.Add($Item)
-                    }
-
-                    if($KeyVaultList)
-                    {
-                        if($Bek)
-                        {
-                            $Longest = ($KeyVaultList + $BekKeyVaultName | Sort-Object Length -Descending)[0]
-                            $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                                $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
-                        }
-
-                        if($Kek)
-                        {
-                            $Longest = ($KeyVaultList + $KekKeyVaultName  | Sort-Object Length -Descending)[0]
-                            $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                                $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
-                        }
-                    }
-                }
-
-               for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
-                {
-                    if ($FormElements[$FormElementsList[$Index]].Text -ne [ConstantStrings]::notApplicable)
-                    {
-                        $FormElements[$FormElementsList[$Index]].Enabled = $true
-                    }
-                }
-            }
-
-            $LoadingLabel.Text = [string]::Empty
+        if (-not $Bek)
+        {
+            $BekDropDown.Text = [ConstantStrings]::notApplicable
+            $BekDropDown.Enabled = $false
+            $FailCount += 1
         }
         else
         {
-            $BekDropDown.Items.Clear()
-            $KekDropDown.Items.Clear()
+            $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + $LocationName
+
+            if ($BekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
+            {
+                $allowedLength = [ConstantStrings]::keyVaultNameMaxLength - $LocationName.Length
+                $BekKeyVaultName =
+                    ($Bek.SourceVault.Id.Split('/')[-1]).Substring(0, $allowedLength) + `
+                    $LocationName
+            }
+
+            $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
+
+            if (-not $BekKeyVault)
+            {
+                $BekKeyVaultName = [ConstantStrings]::newPrefix + $BekKeyVaultName
+                $BekDropDown.Items.Add($BekKeyVaultName)
+            }
+
+            $BekDropDown.Text = $BekKeyVaultName
         }
+
+        $LoadingLabel.Text = [ConstantStrings]::loadingKEK
+
+        if (-not $Kek)
+        {
+            $KekDropDown.Text = [ConstantStrings]::notApplicable
+            $KekDropDown.Enabled = $false
+            $FailCount += 1
+        }
+        else
+        {
+            $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + $LocationName
+
+            if ($KekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
+            {
+                $allowedLength = [ConstantStrings]::keyVaultNameMaxLength - $LocationName.Length
+                $KekKeyVaultName =
+                    ($Kek.SourceVault.Id.Split('/')[-1]).Substring(0, $allowedLength) + `
+                    $LocationName
+            }
+
+            $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
+
+            if (-not $KekKeyVault)
+            {
+                $KekKeyVaultName = [ConstantStrings]::newPrefix + $KekKeyVaultName
+                $KekDropDown.Items.Add($KekKeyVaultName)
+            }
+
+            $KekDropDown.Text = $KekKeyVaultName
+        }
+
+        if ($FailCount -lt 2)
+        {
+            if ($BekDropDown.Items.Count -le 1)
+            {
+                $KeyVaultList = (Get-AzKeyVault | Where-Object { `
+                    $_.Location -like $LocationName}).VaultName | Sort-Object
+
+                foreach ($Item in $KeyVaultList)
+                {
+                    $SuppressOutput = $BekDropDown.Items.Add($Item)
+                    $SuppressOutput = $KekDropDown.Items.Add($Item)
+                }
+
+                if($KeyVaultList)
+                {
+                    if($Bek)
+                    {
+                        $Longest = ($KeyVaultList + $BekKeyVaultName | Sort-Object Length -Descending)[0]
+                        $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
+                            $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
+                    }
+
+                    if($Kek)
+                    {
+                        $Longest = ($KeyVaultList + $KekKeyVaultName  | Sort-Object Length -Descending)[0]
+                        $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
+                            $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
+                    }
+                }
+            }
+
+            for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
+            {
+                if ($FormElements[$FormElementsList[$Index]].Text -ne [ConstantStrings]::notApplicable)
+                {
+                    $FormElements[$FormElementsList[$Index]].Enabled = $true
+                }
+            }
+        }
+
+        $LoadingLabel.Text = [string]::Empty
+    }
+    else
+    {
+        $BekDropDown.Items.Clear()
+        $KekDropDown.Items.Clear()
     }
 }
 
@@ -944,7 +950,7 @@ function Encrypt-Secret(
         Headers     = @{
             [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
         Method      = [ConstantStrings]::httpPost
-        URI         = "$KeyId" + '/encrypt?api-version=2016-10-01'
+        URI         = "$KeyId" + '/encrypt?api-version=7.1'
         Body        = $BodyJson}
 
     try
@@ -995,7 +1001,7 @@ function Decrypt-Secret(
         Headers     = @{
             [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
         Method      = [ConstantStrings]::httpPost
-        URI         = "$KeyId" + '/decrypt?api-version=2016-10-01'
+        URI         = "$KeyId" + '/decrypt?api-version=7.1'
         Body        = $BodyJson}
 
     try
@@ -1426,7 +1432,7 @@ function Start-CopyKeys
             $VmName = $Source.Name
 
             # Only VMName as source name if 2 pass else VMName - DiskName
-            $SourceName = if ($Source.DiskName -eq "") { $Source.Name } else `
+            $SourceName = if ([string]::IsNullOrEmpty($Source.DiskName)) { $Source.Name } else `
                 { $Source.Name + " - " + $Source.DiskName }
 
             # If output diskName is empty -> 2-pass else 1-pass
@@ -1473,7 +1479,8 @@ function Start-CopyKeys
 
             if ([string]::IsNullOrEmpty($BekSecretBase64))
             {
-                $BekSecretBase64 = ($BekSecret.SecretValue | ConvertFrom-SecureString)
+                $BekSecretBase64 = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
+                -Name $Url.Segments[2].TrimEnd("/") -AsPlainText
             }
 
             $BekTags = $BekSecret.Attributes.Tags
@@ -1579,7 +1586,7 @@ function Start-CopyKeys
         }
         catch
         {
-            Write-Warning "CopyKeys not completed for $SourceName`n"
+            Write-Warning "CopyKeys not completed for $SourceName`n`n"
             $IncompleteList[$SourceName] = $_
         }
     }
