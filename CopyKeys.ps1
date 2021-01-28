@@ -219,22 +219,15 @@ class Logger
         [string] $message,
         [LogType] $type)
     {
-        switch ($type) {
-
-            ([LogType]::OUTPUT) {
-                Write-Host -ForegroundColor Green $message
-                Out-File -FilePath $($this.GetFullPath()) -InputObject $message -Append `
-                    -NoClobber -Width $this.lineWidth
-                break
-            }
-
-            Default {
-                Out-File -FilePath $($this.GetFullPath()) -InputObject $this.GetFormattedMessage(
-                    $invocationInfo,
-                    $message,
-                    $type) -Append -NoClobber -Width $this.lineWidth
-            }
+        if ([LogType]::OUTPUT -eq $type)
+        {
+            Write-Host -ForegroundColor Green $message
         }
+
+        Out-File -FilePath $($this.GetFullPath()) -InputObject $this.GetFormattedMessage(
+            $invocationInfo,
+            $message,
+            $type) -Append -NoClobber -Width $this.lineWidth
     }
 
     ### <summary>
@@ -1416,7 +1409,7 @@ function Start-CopyKeys
 
     $OutputLogger.Log(
         $MyInvocation,
-        "`nStarting CopyKeys for UserId: $UserId, UserPrincipalName: $UserPrincipalName`n",
+        "`nStarting CopyKeys for UserId: $UserId, UserPrincipalName: $UserPrincipalName",
         [LogType]::OUTPUT)
 
     $IsFirstBekVault = $IsFirstKekVault = $true
@@ -1439,7 +1432,7 @@ function Start-CopyKeys
             $OutputLogger.LogObject(
                 $MyInvocation,
                 $Source,
-                "Source infromation.",
+                "Source information.",
                 [LogType]::INFO)
 
             $Bek = $Source.Bek
@@ -1493,11 +1486,11 @@ function Start-CopyKeys
                 $OutputLogger.Log(
                     $MyInvocation,
                     "SourceKEKVault: $($KekKeyVaultResource.Name)",
-                    [LogType]::INFO)
+                    [LogType]::OUTPUT)
                 $OutputLogger.Log(
                     $MyInvocation,
                     "SourceKEKId: $($Kek.KeyUrl)",
-                    [LogType]::INFO)
+                    [LogType]::OUTPUT)
 
                 if ($IsFirstKekVault)
                 {
