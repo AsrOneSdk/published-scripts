@@ -472,6 +472,12 @@ function Get-KeyVaults
             else
             {
                 $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + '-asr'
+		if ($BekKeyVaultName.Length -gt 24)
+                {
+                    $newBekKeyVaultName = $BekKeyVaultName.Substring(0,19) + "-asr"
+                    $BekKeyVaultName = $newBekKeyVaultName
+                }
+
                 $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
 
                 if (-not $BekKeyVault)
@@ -494,6 +500,12 @@ function Get-KeyVaults
             else
             {
                 $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + '-asr'
+ 		if ($KekKeyVaultName.Length -gt 24)
+                {
+                    $newKekKeyVaultName = $KekKeyVaultName.Substring(0,19) + "-asr"
+                    $KekKeyVaultName = $newKekKeyVaultName
+                }
+
                 $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
 
                 if (-not $KekKeyVault)
@@ -867,7 +879,7 @@ function New-Sources {
     {
         $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
 
-        if ($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings)
+        if (($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings) -or ($Vm.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq $false) )
         {
             $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
             $Disks = $Vm.Disks
@@ -1190,9 +1202,12 @@ function Start-CopyKeys
     Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
 
     $TenantId = $Context.Tenant.Id
-    $AuthResult = Get-Authentication
-    $AccessToken = $AuthResult.AccessToken
-    $UserId = $AuthResult.UserInfo.UniqueId
+    #$AuthResult = Get-Authentication
+    #$AccessToken = $AuthResult.AccessToken
+    $AccessTokenDetails = Get-AzAccessToken -ResourceUrl "https://vault.azure.net" -TenantId $TenantId
+    $AccessToken = $AccessTokenDetails.Token
+    $UserPrincipalName = $(Get-AzContext).Account.Id
+    $UserId = (Get-AzADUser -UserPrincipalName $UserPrincipalName).Id
 
     Write-Debug "`nStarting CopyKeys for UserId: $UserId`n"
 
@@ -1264,7 +1279,10 @@ function Start-CopyKeys
             [uri]$Url = $Bek.SecretUrl
             $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
                 -Name $Url.Segments[2].TrimEnd("/")
-            $BekSecretBase64 = $BekSecret.SecretValueText
+            $BekSecretSecure = $BekSecret.SecretValue
+	    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($BekSecretSecure)
+	    $BekSecretBase64 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+
             $BekTags = $BekSecret.Attributes.Tags
 
             if ($Kek)
