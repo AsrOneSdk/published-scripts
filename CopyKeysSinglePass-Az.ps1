@@ -750,26 +750,6 @@ function Generate-UserInterface
 }
 
 ### <summary>
-### Gets the authentication result to key vaults.
-### </summary>
-function Get-Authentication
-{
-    # Vault resources endpoint
-    $ArmResource = "https://vault.azure.net"
-    # Well known client ID for AzurePowerShell used to authenticate scripts to Azure AD.
-    $ClientId = "1950a258-227b-4e31-a9cf-717495945fc2"
-    $RedirectUri = "urn:ietf:wg:oauth:2.0:oob"
-    $AuthorityUri = "https://login.windows.net/$TenantId"
-    $AuthContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" `
-        -ArgumentList $AuthorityUri
-    $PlatformParameters = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters" `
-        -ArgumentList "Auto", $null
-    $AuthResult = $AuthContext.AcquireTokenAsync($ArmResource, $ClientId, $RedirectUri, $PlatformParameters)
-
-    return $AuthResult.Result
-}
-
-### <summary>
 ### Encrypts the secret based on the key provided.
 ### </summary>
 ### <param name="DecryptedValue">Decrypted secret value.</param>
@@ -1202,8 +1182,6 @@ function Start-CopyKeys
     Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
 
     $TenantId = $Context.Tenant.Id
-    #$AuthResult = Get-Authentication
-    #$AccessToken = $AuthResult.AccessToken
     $AccessTokenDetails = Get-AzAccessToken -ResourceUrl "https://vault.azure.net" -TenantId $TenantId
     $AccessToken = $AccessTokenDetails.Token
     $UserPrincipalName = $(Get-AzContext).Account.Id
@@ -1280,8 +1258,8 @@ function Start-CopyKeys
             $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
                 -Name $Url.Segments[2].TrimEnd("/")
             $BekSecretSecure = $BekSecret.SecretValue
-	    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($BekSecretSecure)
-	    $BekSecretBase64 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+			$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($BekSecretSecure)
+			$BekSecretBase64 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 
             $BekTags = $BekSecret.Attributes.Tags
 
