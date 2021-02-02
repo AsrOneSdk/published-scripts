@@ -1,4 +1,4 @@
-﻿### ---------------------------------------------------------------
+### ---------------------------------------------------------------
 ### <script name=CopyKeys>
 ### <summary>
 ### This script copies the disk encryption keys and key encryption
@@ -8,49 +8,98 @@
 ### </summary>
 ###
 ### <param name="FilePath">Optional parameter defining the location of the output file.</param>
-### <param name="ForceDebug">Optional parameter forcing debug output without any prompts.</param>
-### <param name="Verbose">Optional parameter to enable verbose logging messages.</param>
 ### ---------------------------------------------------------------
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false,
                HelpMessage="Location of the output file.")]
-    [string]$FilePath = $null,
-
-    [Parameter(Mandatory = $false,
-               HelpMessage="Forces debug output without any prompts.")]
-    [switch]$ForceDebug)
+    [string]$FilePath = $null)
 
 ### Checking for module versions and assemblies.
-Import-Module AZ
+#Requires -Modules "Az.Compute"
+#Requires -Modules @{ ModuleName="Az.KeyVault"; ModuleVersion="3.0.0" }
+#Requires -Modules @{ ModuleName="Az.Accounts"; ModuleVersion="2.2.3" }
 Set-StrictMode -Version 1.0
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+#region Logger
+
 ### <summary>
-###  Basic class to write output.
+###  Types of logs available.
+### </summary>
+Enum LogType
+{
+    ### <summary>
+    ###  Log type is error.
+    ### </summary>
+    ERROR = 1
+
+    ### <summary>
+    ###  Log type is warning.
+    ### </summary>
+    WARNING = 2
+
+    ### <summary>
+    ###  Log type is debug.
+    ### </summary>
+    DEBUG = 3
+
+    ### <summary>
+    ###  Log type is information.
+    ### </summary>
+    INFO = 4
+
+    ### <summary>
+    ###  Log type is output.
+    ### </summary>
+    OUTPUT = 5
+}
+
+### <summary>
+###  Class to log results.
 ### </summary>
 class Logger
 {
     ### <summary>
     ###  Gets the output file name.
     ### </summary>
-    [string]$FileName
+    [string]$fileName
 
     ### <summary>
     ###  Gets the output file location.
     ### </summary>
-    [string]$FilePath
+    [string]$filePath
+
+    ### <summary>
+    ###  Gets the output line width.
+    ### </summary>
+    [int]$lineWidth
+
+    ### <summary>
+    ###  Gets the debug segment status.
+    ### </summary>
+    [bool]$isDebugSegmentOpen
+
+    ### <summary>
+    ###  Gets the debug output.
+    ### </summary>
+    [System.Object[]]$debugOutput
+
     ### <summary>
     ###  Initializes an instance of class OutLogger.
     ### </summary>
-    ### <param name="Name">Name of the file.</param>
-    ### <param name="Path">Local or absolute path to the file.</param>
-    Logger([String]$Name, [string]$Path)
+    ### <param name="name">Name of the file.</param>
+    ### <param name="path">Local or absolute path to the file.</param>
+    Logger(
+        [String]$name,
+        [string]$path)
     {
-        $this.FileName = $Name
-        $this.FilePath = $Path
+        $this.fileName = $name
+        $this.filePath = $path
+        $this.isDebugSegmentOpen = $false
+        $this.lineWidth = 80
     }
 
     ### <summary>
@@ -58,36 +107,317 @@ class Logger
     ### </summary>
     [String] GetFullPath()
     {
-        $Path = $this.FileName + '.log'
+        $path = $this.fileName + '.log'
 
-        if($this.FilePath)
+        if($this.filePath)
         {
-            if (-not (Test-Path $this.FilePath))
+            if (-not (Test-Path $this.filePath))
             {
-                Write-Warning "Invalid file path: $($this.FilePath)"
-                return $Path
+                Write-Warning "Invalid file path: $($this.filePath)"
+                return $path
             }
 
-            if ($this.FilePath[-1] -ne "\")
+            if ($this.filePath[-1] -ne "\")
             {
-                $this.FilePath = $this.FilePath + "\"
+                $this.filePath = $this.filePath + "\"
             }
 
-            $Path = $this.FilePath + $Path
+            $path = $this.filePath + $path
         }
 
-        return $Path
+        return $path
+    }
+
+
+    ### <summary>
+    ###  Gets the full file path.
+    ### </summary>
+    ### <param name="invocationInfo">Gets the invocation information.</param>
+    ### <param name="message">Gets the message to be logged.</param>
+    ### <param name="type">Gets the type of log.</param>
+    ### <return>String containing the formatted message -
+    ### Type: DateTime ScriptName Line [Method]: Message.</return>
+    [String] GetFormattedMessage(
+        [System.Management.Automation.InvocationInfo] $invocationInfo,
+        [string]$message,
+        [LogType] $type)
+    {
+        $dateTime = Get-Date -uFormat "%d/%m/%Y %r"
+        $line = $type.ToString() + "`t`t: $dateTime "
+        $line +=
+            "$($invocationInfo.scriptName.split('\')[-1]):$($invocationInfo.scriptLineNumber) " + `
+            "[$($invocationInfo.invocationName)]: "
+        $line += $message
+
+        return $line
     }
 
     ### <summary>
-    ###  Appends a line to the output file.
+    ###  Starts the debug segment.
     ### </summary>
-    ### <param name="Line">String to be appended to the file.</param>
-    [Void] WriteLine([string]$Line)
+    [Void] StartDebugLog()
     {
-        Out-File -FilePath $($this.GetFullPath()) -InputObject $Line -Append -NoClobber
+        $script:DebugPreference = "Continue"
+        $this.isDebugSegmentOpen = $true
+    }
+
+    ### <summary>
+    ###  Stops the debug segment.
+    ### </summary>
+    [Void] StopDebugLog()
+    {
+        $script:DebugPreference = "SilentlyContinue"
+        $this.isDebugSegmentOpen = $false
+    }
+
+    ### <summary>
+    ###  Gets the debug output and stores it in $DebugOutput.
+    ### </summary>
+    ### <param name="command">Command whose debug output needs to be redirected.</param>
+    ### <return>Command modified to get the debug output to the success stream to be stored in
+    ### a variable.</return>
+    [string] GetDebugOutput([string]$command)
+    {
+        if ($this.isDebugSegmentOpen)
+        {
+            return '$(' + $command + ') 5>&1'
+        }
+
+        return $command
+    }
+
+    ### <summary>
+    ###  Redirects the debug output to the output file.
+    ### </summary>
+    ### <param name="invocationInfo">Gets the invocation information.</param>
+    ### <param name="command">Gets the command whose debug output needs to be redirected.</param>
+    ### <return>Command modified to redirect debug stream to the log file.</return>
+    [string] RedirectDebugOutput(
+        [System.Management.Automation.InvocationInfo] $invocationInfo,
+        [string]$command)
+    {
+        if ($this.isDebugSegmentOpen)
+        {
+            $this.Log(
+                $InvocationInfo,
+                "Debug output for command: $command`n",
+                [LogType]::DEBUG)
+            return $command + " 5>> $($this.GetFullPath())"
+        }
+
+        return $command
+    }
+
+    ### <summary>
+    ###  Appends a message to the output file.
+    ### </summary>
+    ### <param name="invocationInfo">Gets the invocation information.</param>
+    ### <param name="message">Gets the message to be logged.</param>
+    ### <param name="type">Gets the type of log.</param>
+    [Void] Log(
+        [System.Management.Automation.InvocationInfo] $invocationInfo,
+        [string] $message,
+        [LogType] $type)
+    {
+        if ([LogType]::OUTPUT -eq $type)
+        {
+            Write-Host -ForegroundColor Green $message
+        }
+
+        Out-File -FilePath $($this.GetFullPath()) -InputObject $this.GetFormattedMessage(
+            $invocationInfo,
+            $message,
+            $type) -Append -NoClobber -Width $this.lineWidth
+    }
+
+    ### <summary>
+    ###  Appends an object to the output file.
+    ### </summary>
+    ### <param name="invocationInfo">Gets the invocation information.</param>
+    ### <param name="object">Gets the object to be logged.</param>
+    ### <param name="message">Gets the message to be logged.</param>
+    ### <param name="type">Gets the type of log.</param>
+    [Void] LogObject(
+        [System.Management.Automation.InvocationInfo] $invocationInfo,
+        $object,
+        [string] $message,
+        [LogType] $type)
+    {
+        Out-File -FilePath $($this.GetFullPath()) -InputObject $this.GetFormattedMessage(
+            $invocationInfo,
+            "`n",
+            $type) -Append -NoClobber -Width $this.lineWidth
+
+        if (-not [string]::IsNullOrEmpty($message))
+        {
+            $this.Log($invocationInfo, $message, $type)
+        }
+
+        Out-File -FilePath $($this.GetFullPath()) -InputObject `
+            $(ConvertTo-Json -InputObject $object) -Append -NoClobber
     }
 }
+#endRegion
+
+#region Source
+
+### <summary>
+###  Class for the source machines.
+### </summary>
+class Source
+{
+    ### <summary>
+    ###  Gets VM source name.
+    ### </summary>
+    [string]$Name
+
+    ### <summary>
+    ###  Gets name of disks.
+    ### </summary>
+    [string]$DiskName
+
+    ### <summary>
+    ###  Gets disk encryption key information.
+    ### </summary>
+    [Microsoft.Azure.Management.Compute.Models.KeyVaultSecretReference]$Bek
+
+    ### <summary>
+    ###  Gets key encryption key information.
+    ### </summary>
+    [Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference]$Kek
+
+    ### <summary>
+    ###  Initializes an instance of Source.
+    ### </summary>
+    ### <param name="Name">Gets the source name.</param>
+    Source([String]$Name, [String]$DiskName)
+    {
+        $this.Name = $Name
+        $this.DiskName = $DiskName
+    }
+}
+#endregion
+
+#region Constants
+
+class ConstantStrings
+{
+    static [string] $adeExtensionPrefix = "azurediskencryption"
+    static [string] $asrSuffix = "-asr"
+    static [string] $authHeader = "authorization"
+    static [string] $contentType = "application/json"
+    static [string] $httpPost = "POST"
+    static [int] $keyVaultNameMaxLength = 24
+    static [string] $loadingBEK = "Loading target BEK vault"
+    static [string] $loadingKEK = "Loading target KEK vault"
+    static [string] $loadingRG = "Loading resource groups"
+    static [string] $newPrefix = "(new)"
+    static [string] $noAdeVmInResourceGroup = "Selected resource group does `nnot contain any " + `
+        "encrypted VMs."
+    static [string] $notApplicable = "Not Applicable"
+    static [string] $subscriptions = "subscriptions"
+    static [string] $tokenType = "Bearer"
+}
+#endregion
+
+
+#Region Errors
+
+### <summary>
+### Class to maintain all the errors.
+### </summary>
+class Errors
+{
+    ### <summary>
+    ###  Encryption information missing.
+    ### </summary>
+    ### <param name="vmName">Virtual machine name.</param>
+    ### <return>Error string.</return>
+    static [string] EncryptionInfoMissing([string] $vmName)
+    {
+        return "Virtual machine $vmName encrypted but encryption settings details missing."
+    }
+
+    ### <summary>
+    ###  Disk encryption information missing.
+    ### </summary>
+    ### <param name="vmName">Virtual machine name.</param>
+    ### <param name="diskName">Disk name.</param>
+    ### <return>Error string.</return>
+    static [string] DiskEncryptionInfoMissing([string] $vmName, [string] $diskName)
+    {
+        return "Virtual machine $vmName encrypted but disk encryption " + `
+        "settings missing for disk - $diskName."
+    }
+
+    ### <summary>
+    ###  Secret encryption failed.
+    ### </summary>
+    ### <param name="message">Error message.</param>
+    ### <return>Error string.</return>
+    static [string] SecretEncryptionFailed([string] $message)
+    {
+        return "Secret encryption failed with error - `n$message."
+    }
+
+    ### <summary>
+    ###  Secret decryption failed.
+    ### </summary>
+    ### <param name="message">Error message.</param>
+    ### <return>Error string.</return>
+    static [string] SecretDecryptionFailed([string] $message)
+    {
+        return "Secret decryption failed with error - `n$message."
+    }
+
+    ### <summary>
+    ###  Access policy permissions missing.
+    ### </summary>
+    ### <param name="type">Resource type.</param>
+    ### <param name="keyVaultName">Key vault name.</param>
+    ### <param name="permissionsRequired">Permissions required for copy keys.</param>
+    ### <return>Error string.</return>
+    static [string] MissingPermissions(
+        [string] $type,
+        [string] $keyVaultName,
+        [string[]] $permissionsRequired)
+    {
+        return "You do not have sufficient permissions to access '$type' in the key vault " + `
+            "$keyVaultName. You need $($permissionsRequired -join ',') for key vault '$type'."
+    }
+
+    ### <summary>
+    ###  User access policy missing.
+    ### </summary>
+    ### <param name="userId">User id.</param>
+    ### <param name="keyVaultName">Key vault name.</param>
+    ### <param name="allowedObjectIds">Allowed object ids.</param>
+    ### <return>Error string.</return>
+    static [string] UserMissingAccess(
+        [string] $userId,
+        [string] $keyVaultName,
+        [string[]] $allowedObjectIds)
+    {
+        return "User with user id: $userId does not have access to the key vault " + `
+            "$keyVaultName. Permitted object ids include - $($allowedObjectIds -join ',')."
+    }
+
+    ### <summary>
+    ###  Key missing.
+    ### </summary>
+    ### <param name="keyName">Key name.</param>
+    ### <param name="keyVersion">Key version.</param>
+    ### <param name="keyVaultName">Key vault name.</param>
+    ### <return>Error string.</return>
+    static [string] KeyMissing([string] $keyName, [string] $keyVersion, [string] $keyVaultName)
+    {
+        return "Key with name: $keyName and version: $keyVersion could not be found in key " + `
+            "vault $keyVaultName."
+    }
+}
+#EndRegion
+
+#region UI
 
 ### <summary>
 ### Displays messages when cursor hovers over UI objects.
@@ -105,14 +435,15 @@ function Get-ResourceGroups
     $SubscriptionName = $this.SelectedItem.ToString()
     if ($SubscriptionName)
     {
-        $LoadingLabel.Text = "Loading resource groups"
+        $LoadingLabel.Text = [ConstantStrings]::loadingRG
 
         Select-AzSubscription -SubscriptionName $SubscriptionName
         $ResourceProvider = Get-AzResourceProvider -ProviderNamespace Microsoft.Compute
 
         # Locations taken from resource type: availabilitySets instead of resource type: Virtual machines,
         # just to stay in parallel with the Portal.
-        $Locations = ($ResourceProvider[0].Locations) | % { $_.Split(' ').tolower() -join ''} | sort
+        $Locations = ($ResourceProvider[0].Locations) | ForEach-Object {
+            $_.Split(' ').tolower() -join ''} | Sort-Object
         $ResourceGroupLabel = $FormElements["ResourceGroupLabel"]
         $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
         $VmListBox = $FormElements["VmListBox"]
@@ -122,9 +453,9 @@ function Get-ResourceGroups
         $ResourceGroupDropDown.Items.Clear()
         $VmListBox.Items.Clear()
         $LocationDropDown.Items.Clear()
-        $ResourceGroupDropDown.Text = ""
+        $ResourceGroupDropDown.Text = [string]::Empty
 
-        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | sort
+        [array]$ResourceGroupArray = (Get-AzResourceGroup).ResourceGroupName | Sort-Object
 
         foreach ($Item in $ResourceGroupArray)
         {
@@ -133,7 +464,7 @@ function Get-ResourceGroups
 
         if($ResourceGroupArray)
         {
-            $Longest = ($ResourceGroupArray | sort Length -Descending)[0]
+            $Longest = ($ResourceGroupArray | Sort-Object Length -Descending)[0]
             $ResourceGroupDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $ResourceGroupDropDown.Font).Width, $ResourceGroupDropDown.Width | Measure-Object -Maximum).Maximum
         }
@@ -145,7 +476,7 @@ function Get-ResourceGroups
 
         if($Locations)
         {
-            $Longest = ($Locations | sort Length -Descending)[0]
+            $Longest = ($Locations | Sort-Object Length -Descending)[0]
             $LocationDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $LocationDropDown.Font).Width, $LocationDropDown.Width | Measure-Object -Maximum).Maximum
         }
@@ -155,7 +486,7 @@ function Get-ResourceGroups
             $FormElements[$FormElementsList[$Index]].Enabled = $false
         }
 
-        $LoadingLabel.Text = ""
+        $LoadingLabel.Text = [string]::Empty
     }
 }
 
@@ -167,20 +498,23 @@ function Get-VirtualMachines
     $ResourceGroupName = $this.SelectedItem.ToString()
     if ($ResourceGroupName)
     {
-        $LoadingLabel.Text = ""
+        $LoadingLabel.Text = [string]::Empty
         $VmListBox = $FormElements["VmListBox"]
         $VmListBox.Items.Clear()
         $FormElements["VmLabel"].Enabled = $true
         $FormElements["LocationLabel"].Enabled = $true
         $VmListBox.Enabled = $true
         $LocationDropDown.Enabled = $true
-        $LocationDropDown.Text = ""
+        $LocationDropDown.Text = [string]::Empty
 
-        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | sort Name
+        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | Sort-Object Name
 
         foreach ($Item in $VmList)
         {
-            if ($Item.StorageProfile.OsDisk.EncryptionSettings.Enabled -eq "True")
+            if (($null -ne $Item.Extensions) -and
+                ($Item.Extensions.Id | ForEach-Object { `
+                    $_.split('/')[-1].tolower().contains( `
+                        [ConstantStrings]::adeExtensionPrefix)}) -contains $true)
             {
                 $SuppressOutput = $VmListBox.Items.Add($Item.Name)
             }
@@ -188,7 +522,7 @@ function Get-VirtualMachines
 
         if($VmList -and ($VmListBox.Items.Count -gt 0))
         {
-            $Longest = ($VmList.Name | sort Length -Descending)[0]
+            $Longest = ($VmList.Name | Sort-Object Length -Descending)[0]
             $Size = [System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
                 $VmListBox.Font).Width
 
@@ -200,7 +534,7 @@ function Get-VirtualMachines
         }
         else
         {
-            $LoadingLabel.Text = "Selected resource group does `nnot contain any encrypted VMs."
+            $LoadingLabel.Text = [ConstantStrings]::noAdeVmInResourceGroup
         }
 
         for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
@@ -215,13 +549,13 @@ function Get-VirtualMachines
 ### </summary>
 function Disable-RestOfOptions
 {
-    $FormElements["LocationDropDown"].Text = ""
-    $FormElements["BekDropDown"].Text = ""
-    $FormElements["KekDropDown"].Text = ""
+    $FormElements["LocationDropDown"].Text = [string]::Empty
+    $FormElements["BekDropDown"].Text = [string]::Empty
+    $FormElements["KekDropDown"].Text = [string]::Empty
 
     for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
     {
-        if ($FormElements[$FormElementsList[$Index]].Text -ne 'Not Applicable')
+        if ($FormElements[$FormElementsList[$Index]].Text -ne [ConstantStrings]::notApplicable)
         {
             $FormElements[$FormElementsList[$Index]].Enabled = $false
         }
@@ -235,122 +569,169 @@ function Get-KeyVaults
 {
     $LocationName = $this.SelectedItem.ToString()
 
-    if ($LocationName)
+    if ([string]::IsNullOrEmpty($LocationName))
     {
-        $BekDropDown = $FormElements["BekDropDown"]
-        $KekDropDown = $FormElements["KekDropDown"]
-        $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
-        $VmSelected = $FormElements["VmListBox"].CheckedItems
-        $FailCount = 0
+        return
+    }
 
-        if ($VmSelected)
+    $BekDropDown = $FormElements["BekDropDown"]
+    $KekDropDown = $FormElements["KekDropDown"]
+    $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
+    $VmSelected = $FormElements["VmListBox"].CheckedItems
+    $FailCount = 0
+
+    if ($VmSelected)
+    {
+        $LoadingLabel.Text = [ConstantStrings]::loadingBEK
+        $Bek = $Kek = [string]::Empty
+        $Index = 0
+
+        while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
         {
-            $LoadingLabel.Text = "Loading target BEK vault"
-            $Bek = $Kek = ""
-            $Index = 0
-
-            while ((-not $Kek) -and ($Index -lt $VmSelected.Count))
-            {
-                $Vm = Get-AzVM -ResourceGroupName `
+            $Vm = Get-AzVM -ResourceGroupName `
                 $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index]
 
-                if (-not $Bek)
+            if (($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings) -or `
+                (-not $Vm.StorageProfile.OsDisk.EncryptionSettings.Enabled))
+            {
+                $Vm = Get-AzVM -ResourceGroupName `
+                    $ResourceGroupDropDown.SelectedItem.ToString() -Name $VmSelected[$Index] -Status
+
+                $Disks = $Vm.Disks
+                $IsNotEncrypted = $true
+
+                foreach ($Disk in $Disks)
                 {
-                    $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
+                    if ($null -ne $Disk.EncryptionSettings)
+                    {
+                        $IsNotEncrypted = $false
+                        $Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
+                        $Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
+
+                        break
+                    }
                 }
 
+                if($IsNotEncrypted)
+                {
+                    throw [Errors]::EncryptionInfoMissing($vm.Name)
+                }
+            }
+            else
+            {
+                $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
                 $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
-                $Index++
             }
 
-            if (-not $Bek)
-            {
-                $BekDropDown.Text = "Not Applicable"
-                $BekDropDown.Enabled = $false
-                $FailCount += 1
-            }
-            else
-            {
-                $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
+            $Index++
+        }
 
-                if (-not $BekKeyVault)
-                {
-                    $BekKeyVaultName = '(new)' + $BekKeyVaultName
-                    $BekDropDown.Items.Add($BekKeyVaultName)
-                }
-
-                $BekDropDown.Text = $BekKeyVaultName
-            }
-
-            $LoadingLabel.Text = "Loading target KEK vault"
-
-            if (-not $Kek)
-            {
-                $KekDropDown.Text = "Not Applicable"
-                $KekDropDown.Enabled = $false
-                $FailCount += 1
-            }
-            else
-            {
-                $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + '-asr'
-                $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
-
-                if (-not $KekKeyVault)
-                {
-                    $KekKeyVaultName = '(new)' + $KekKeyVaultName
-                    $KekDropDown.Items.Add($KekKeyVaultName)
-                }
-
-                $KekDropDown.Text = $KekKeyVaultName
-            }
-
-            if ($FailCount -lt 2)
-            {
-                if ($BekDropDown.Items.Count -le 1)
-                {
-                    $KeyVaultList = (Get-AzKeyVault).VaultName | sort
-
-                    foreach ($Item in $KeyVaultList)
-                    {
-                        $SuppressOutput = $BekDropDown.Items.Add($Item)
-                        $SuppressOutput = $KekDropDown.Items.Add($Item)
-                    }
-
-                    if($KeyVaultList)
-                    {
-                        if($Bek)
-                        {
-                            $Longest = ($KeyVaultList + $BekKeyVaultName | sort Length -Descending)[0]
-                            $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                                $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
-                        }
-
-                        if($Kek)
-                        {
-                            $Longest = ($KeyVaultList + $KekKeyVaultName  | sort Length -Descending)[0]
-                            $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                                $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
-                        }
-                    }
-                }
-
-               for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
-                {
-                    if ($FormElements[$FormElementsList[$Index]].Text -ne 'Not Applicable')
-                    {
-                        $FormElements[$FormElementsList[$Index]].Enabled = $true
-                    }
-                }
-            }
-
-            $LoadingLabel.Text = ""
+        if (-not $Bek)
+        {
+            $BekDropDown.Text = [ConstantStrings]::notApplicable
+            $BekDropDown.Enabled = $false
+            $FailCount += 1
         }
         else
         {
-            $BekDropDown.Items.Clear()
-            $KekDropDown.Items.Clear()
+            $BekKeyVaultName = $Bek.SourceVault.Id.Split('/')[-1] + $LocationName
+
+            if ($BekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
+            {
+                $allowedLength = [ConstantStrings]::keyVaultNameMaxLength - $LocationName.Length
+                $BekKeyVaultName =
+                    ($Bek.SourceVault.Id.Split('/')[-1]).Substring(0, $allowedLength) + `
+                    $LocationName
+            }
+
+            $BekKeyVault = Get-AzResource -Name $BekKeyVaultName
+
+            if (-not $BekKeyVault)
+            {
+                $BekKeyVaultName = [ConstantStrings]::newPrefix + $BekKeyVaultName
+                $BekDropDown.Items.Add($BekKeyVaultName)
+            }
+
+            $BekDropDown.Text = $BekKeyVaultName
         }
+
+        $LoadingLabel.Text = [ConstantStrings]::loadingKEK
+
+        if (-not $Kek)
+        {
+            $KekDropDown.Text = [ConstantStrings]::notApplicable
+            $KekDropDown.Enabled = $false
+            $FailCount += 1
+        }
+        else
+        {
+            $KekKeyVaultName = $Kek.SourceVault.Id.Split('/')[-1] + $LocationName
+
+            if ($KekKeyVaultName.Length -ge [ConstantStrings]::keyVaultNameMaxLength)
+            {
+                $allowedLength = [ConstantStrings]::keyVaultNameMaxLength - $LocationName.Length
+                $KekKeyVaultName =
+                    ($Kek.SourceVault.Id.Split('/')[-1]).Substring(0, $allowedLength) + `
+                    $LocationName
+            }
+
+            $KekKeyVault = Get-AzResource -Name $KekKeyVaultName
+
+            if (-not $KekKeyVault)
+            {
+                $KekKeyVaultName = [ConstantStrings]::newPrefix + $KekKeyVaultName
+                $KekDropDown.Items.Add($KekKeyVaultName)
+            }
+
+            $KekDropDown.Text = $KekKeyVaultName
+        }
+
+        if ($FailCount -lt 2)
+        {
+            if ($BekDropDown.Items.Count -le 1)
+            {
+                $KeyVaultList = (Get-AzKeyVault | Where-Object { `
+                    $_.Location -like $LocationName}).VaultName | Sort-Object
+
+                foreach ($Item in $KeyVaultList)
+                {
+                    $SuppressOutput = $BekDropDown.Items.Add($Item)
+                    $SuppressOutput = $KekDropDown.Items.Add($Item)
+                }
+
+                if($KeyVaultList)
+                {
+                    if($Bek)
+                    {
+                        $Longest = ($KeyVaultList + $BekKeyVaultName | Sort-Object Length -Descending)[0]
+                        $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
+                            $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
+                    }
+
+                    if($Kek)
+                    {
+                        $Longest = ($KeyVaultList + $KekKeyVaultName  | Sort-Object Length -Descending)[0]
+                        $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
+                            $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
+                    }
+                }
+            }
+
+            for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
+            {
+                if ($FormElements[$FormElementsList[$Index]].Text -ne [ConstantStrings]::notApplicable)
+                {
+                    $FormElements[$FormElementsList[$Index]].Enabled = $true
+                }
+            }
+        }
+
+        $LoadingLabel.Text = [string]::Empty
+    }
+    else
+    {
+        $BekDropDown.Items.Clear()
+        $KekDropDown.Items.Clear()
     }
 }
 
@@ -521,14 +902,14 @@ function Generate-UserInterface
 
     # Populating the subscription dropdown and launching the form
 
-    [array]$SubscriptionArray = ((Get-AzSubscription).Name | sort)
+    [array]$SubscriptionArray = ((Get-AzSubscription).Name | Sort-Object)
 
     foreach ($Item in $SubscriptionArray)
     {
         $SuppressOutput = $SubscriptionDropDown.Items.Add($Item)
     }
 
-    $Longest = ($SubscriptionArray | sort Length -Descending)[0]
+    $Longest = ($SubscriptionArray | Sort-Object Length -Descending)[0]
     $SubscriptionDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
         $SubscriptionDropDown.Font).Width, $SubscriptionDropDown.Width | Measure-Object -Maximum).Maximum
 
@@ -536,26 +917,7 @@ function Generate-UserInterface
     $UserInputForm.controls.AddRange($MsLogo)
     [void]$UserInputForm.ShowDialog()
 }
-
-### <summary>
-### Gets the authentication result to key vaults.
-### </summary>
-function Get-Authentication
-{
-    # Vault resources endpoint
-    $ArmResource = "https://vault.azure.net"
-    # Well known client ID for AzurePowerShell used to authenticate scripts to Azure AD.
-    $ClientId = "1950a258-227b-4e31-a9cf-717495945fc2"
-    $RedirectUri = "urn:ietf:wg:oauth:2.0:oob"
-    $AuthorityUri = "https://login.windows.net/$TenantId"
-    $AuthContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" `
-        -ArgumentList $AuthorityUri
-    $PlatformParameters = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters" `
-        -ArgumentList "Auto", $null
-    $AuthResult = $AuthContext.AcquireTokenAsync($ArmResource, $ClientId, $RedirectUri, $PlatformParameters)
-
-    return $AuthResult.Result 
-}
+#endregion
 
 ### <summary>
 ### Encrypts the secret based on the key provided.
@@ -577,27 +939,32 @@ function Encrypt-Secret(
     $BodyJson = ConvertTo-Json -InputObject $Body
 
     $Params = @{
-        ContentType = 'application/json'
+        ContentType = [ConstantStrings]::contentType
         Headers     = @{
-            'authorization' = "Bearer $AccessToken"}
-        Method      = 'POST'
-        URI         = "$KeyId" + '/encrypt?api-version=2016-10-01'
+            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
+        Method      = [ConstantStrings]::httpPost
+        URI         = "$KeyId" + '/encrypt?api-version=7.1'
         Body        = $BodyJson}
 
     try
     {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Starting REST call - " + $Params.URI,
+            [LogType]::INFO)
         $Response = Invoke-RestMethod @Params
     }
     catch
     {
-        $ErrorString = "You do not have sufficient permissions to encrypt. " + `
-            'You need "ENCRYPT" permissions for key vault keys'
-        throw [System.UnauthorizedAccessException] $ErrorString
+        $errorStr = Out-String -InputObject $PSItem
+
+        Write-Verbose "`nEncrypt failure: `n$errorStr"
+        throw [Errors]::SecretEncryptionFailed($errorStr)
     }
     finally
     {
-        Write-Verbose "`nEncrypt request: `n$(ConvertTo-Json -InputObject $Params)"
-        Write-Verbose "`nEncrypt resonse: `n$(ConvertTo-Json -InputObject $Response)"
+        Write-Verbose "`nEncrypt request: `n$(Out-String -InputObject $Params)"
+        Write-Verbose "`nEncrypt resonse: `n$(Out-String -InputObject $Response)"
     }
 
     return $Response
@@ -623,30 +990,107 @@ function Decrypt-Secret(
     $BodyJson = ConvertTo-Json -InputObject $Body
 
     $Params = @{
-        ContentType = 'application/json'
+        ContentType = [ConstantStrings]::contentType
         Headers     = @{
-            'authorization' = "Bearer $AccessToken"}
-        Method      = 'POST'
-        URI         = "$KeyId" + '/decrypt?api-version=2016-10-01'
+            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
+        Method      = [ConstantStrings]::httpPost
+        URI         = "$KeyId" + '/decrypt?api-version=7.1'
         Body        = $BodyJson}
 
     try
     {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Starting REST call - " + $Params.URI,
+            [LogType]::INFO)
         $Response = Invoke-RestMethod @Params
     }
     catch
     {
-        $ErrorString = "You do not have sufficient permissions to decrypt. " + `
-            'You need "DECRYPT" permissions for key vault keys'
-        throw [System.UnauthorizedAccessException] $ErrorString
+        $errorStr = Out-String -InputObject $PSItem
+
+        Write-Verbose "`nDecrypt failure: `n$errorStr"
+        throw [Errors]::SecretDecryptionFailed($errorStr)
     }
     finally
     {
-        Write-Verbose "`nDecrypt request: `n$(ConvertTo-Json -InputObject $Params)"
-        Write-Verbose "`nDecrypt resonse: `n$(ConvertTo-Json -InputObject $Response)"
+        Write-Verbose "`nDecrypt request: `n$(Out-String -InputObject $Params)"
+        Write-Verbose "`nDecrypt resonse: `n$(Out-String -InputObject $Response)"
     }
 
     return $Response
+}
+
+### <summary>
+###  Gets a list of source information objects from list of VM names.
+### </summary>
+### <param name="VmArray">Gets the list of VM names.</param>
+### <param name="SourceResourceGroupName">Gets the source resource group name.</param>
+### <return>List of source information objects.</return>
+function New-Sources {
+    param (
+        [string[]] $VmArray,
+        [string] $SourceResourceGroupName
+    )
+
+    $SourceList = @()
+
+    foreach($VmName in $VmArray)
+    {
+        $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
+
+        if (($null -eq $Vm.StorageProfile.OsDisk.EncryptionSettings) -or `
+            (-not $Vm.StorageProfile.OsDisk.EncryptionSettings.Enabled))
+        {
+            $OutputLogger.Log(
+                $MyInvocation,
+                "VM - $($Vm.Name), is One-Pass Encrypted.",
+                [LogType]::INFO)
+
+            $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
+            $Disks = $Vm.Disks
+
+            for($i=0; $i -lt $Disks.Count; $i++)
+            {
+                $Disk = $Disks[$i]
+                $Source = [Source]::new($VmName, $Disk.Name)
+
+                if($null -ne $Disks[$i].EncryptionSettings)
+                {
+                    $Source.Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
+                    $Source.Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
+
+                    $SourceList += $Source
+                }
+                else
+                {
+                    $OutputLogger.Log(
+                        $MyInvocation,
+                        "Virtual machine $VmName encrypted but disk ($($Disk.Name)) not encrypted.",
+                        [LogType]::OUTPUT)
+                }
+            }
+
+            Write-Host "`n"
+        }
+        else
+        {
+            $OutputLogger.Log(
+                $MyInvocation,
+                "VM - $($Vm.Name), is Two-Pass Encrypted.",
+                [LogType]::INFO)
+
+            # Passing null string inorder to differentiate between 1-pass and 2-pass from the logs
+            $Source = [Source]::new($VmName, "")
+
+            $Source.Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
+            $Source.Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
+
+            $SourceList += $Source
+        }
+    }
+
+    return $SourceList
 }
 
 ### <summary>
@@ -702,6 +1146,11 @@ function Copy-AccessPolicies(
             $WarningString = "Unable to copy access policy for Object Id: $($AccessPolicy.ObjectId) because " + `
                 "of the following issue:`n $($PSItem.Exception.Message)"
             Write-Warning $WarningString
+            $OutputLogger.LogObject(
+                $MyInvocation,
+                $PSItem,
+                "Unable to copy access policy for Object Id: $($AccessPolicy.ObjectId)",
+                [LogType]::WARNING)
         }
 
         $Index++
@@ -724,13 +1173,18 @@ function Compare-Permissions(
     [string[]] $PermissionsRequired,
     $AccessPolicies)
 {
-    $ErrorString1 = "You do not have sufficient permissions to access "
-    $ErrorString2 = " in the key vault $KeyVaultName. You need $($PermissionsRequired -join ',') for key vault "
     $PermissionsType = 'keys'
+
     foreach ($Policy in $AccessPolicies)
     {
         if ($Policy.ObjectId -eq $UserId)
         {
+            $OutputLogger.LogObject(
+                $MyInvocation,
+                $Policy,
+                "Access policy for $UserId",
+                [LogType]::INFO)
+
             if($ResourceObject)
             {
                 $Permissions = $Policy.Permissions.Keys
@@ -741,13 +1195,14 @@ function Compare-Permissions(
                     $PermissionsType = "secrets"
                 }
 
-                $Permissions = $Permissions | %{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
 
-                if (-not $Permissions -or (($PermissionsRequired | % { $Permissions.Contains($_)}) -contains $false))
+                if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
-                    $ErrorString = $ErrorString1 + $PermissionsType + $ErrorString2
-                    $ErrorString += $PermissionsType
-                    throw [System.UnauthorizedAccessException] $ErrorString
+                    throw [Errors]::MissingPermissions(
+                        $PermissionsType,
+                        $KeyVaultName,
+                        $PermissionsRequired)
                 }
             }
             else
@@ -760,13 +1215,14 @@ function Compare-Permissions(
                     $PermissionsType = "secrets"
                 }
 
-                $Permissions = $Permissions | %{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
 
-                if (-not $Permissions -or (($PermissionsRequired | % { $Permissions.Contains($_)}) -contains $false))
+                if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
-                    $ErrorString = $ErrorString1 + $PermissionsType + $ErrorString2
-                    $ErrorString += $PermissionsType + '.'
-                    throw [System.UnauthorizedAccessException] $ErrorString
+                    throw [Errors]::MissingPermissions(
+                        $PermissionsType,
+                        $KeyVaultName,
+                        $PermissionsRequired)
                 }
             }
 
@@ -774,9 +1230,7 @@ function Compare-Permissions(
         }
     }
 
-    $ErrorString = "User with user id: $UserId does not have access to the key vault $KeyVaultName"
-
-    throw [System.UnauthorizedAccessException] $ErrorString
+    throw [Errors]::UserMissingAccess($UserId, $KeyVaultName, $AccessPolicies.ObjectId)
 }
 
 ### <summary>
@@ -802,12 +1256,21 @@ function Conduct-TargetKeyVaultPreReq(
     {
         # Target key vault does not exist
         $TargetKeyVault = $null
+
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Target Key Vault - $TargetKeyVaultName, doesn't exist.",
+            [LogType]::INFO)
     }
 
     if (-not $TargetKeyVault)
     {
         $IsKeyVaultNew.Value = $true
-        Write-Host "Creating key vault $TargetKeyVaultName" -ForegroundColor Green
+
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Creating key vault $TargetKeyVaultName",
+            [LogType]::OUTPUT)
 
         $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
         $TargetResourceGroupName = "$($KeyVaultResource.ResourceGroupName)" + "-asr"
@@ -820,6 +1283,11 @@ function Conduct-TargetKeyVaultPreReq(
         {
             # Target resource group does not exist
             $TargetResourceGroup = $null
+
+            $OutputLogger.Log(
+                $MyInvocation,
+                "Target RG - $TargetResourceGroupName, doesn't exist.",
+                [LogType]::INFO)
         }
 
         if (-not $TargetResourceGroup)
@@ -832,8 +1300,7 @@ function Conduct-TargetKeyVaultPreReq(
             -EnabledForDeployment:$KeyVaultResource.Properties.EnabledForDeployment `
             -EnabledForTemplateDeployment:$KeyVaultResource.Properties.EnabledForTemplateDeployment `
             -EnabledForDiskEncryption:$KeyVaultResource.Properties.EnabledForDiskEncryption `
-            -EnableSoftDelete:$KeyVaultResource.Properties.EnableSoftDelete -Sku $KeyVaultResource.Properties.Sku.name `
-            -Tag $KeyVaultResource.Tags
+            -Sku $KeyVaultResource.Properties.Sku.name -Tag $KeyVaultResource.Tags
     }
     else
     {
@@ -875,15 +1342,24 @@ function Conduct-SourceKeyVaultPreReq(
 ### <param name="ContentType">Type of secret to be created - Wrapped BEK or BEK.</param>
 function Create-Secret(
     $Secret,
-    [string]$ContentType,
-    [Logger]$Logger)
+    [string]$ContentType)
 {
     $SecureSecret = ConvertTo-SecureString $Secret -AsPlainText -Force
     $OutputSecret = Set-AzKeyVaultSecret -VaultName $TargetBekVault -Name $BekSecret.Name -SecretValue `
         $SecureSecret -tags $BekTags -ContentType $ContentType
-    Write-Host 'Copying "Disk Encryption Key" for' "$VmName" -ForegroundColor Green
-    $Logger.WriteLine("TargetBEKVault: $TargetBekVault")
-    $Logger.WriteLine("TargetBEKId: $($OutputSecret.Id)")
+
+    $OutputLogger.Log(
+        $MyInvocation,
+        "Copying 'Disk Encryption Key' for '$SourceName'.",
+        [LogType]::OUTPUT)
+    $OutputLogger.Log(
+        $MyInvocation,
+        "TargetBEKVault: $TargetBekVault",
+        [LogType]::OUTPUT)
+    $OutputLogger.Log(
+        $MyInvocation,
+        "TargetBEKId: $($OutputSecret.Id)",
+        [LogType]::OUTPUT)
 }
 
 ### <summary>
@@ -893,22 +1369,16 @@ function Create-Secret(
 function Start-CopyKeys
 {
     $Context = Get-AzContext
-    if($Context -eq $null)
+
+    if($null -eq $Context)
     {
         $SuppressOutput = Login-AzAccount -ErrorAction Stop
     }
-
-    $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
 
     $CompletedList = @()
     $UserInputs = New-Object System.Collections.Hashtable
     Write-Verbose "Starting user interface to get inputs"
     Generate-UserInterface
-
-    if ($ForceDebug)
-    {
-        $Script:DebugPreference = "Continue"
-    }
 
     $ResourceGroupName = $UserInputs["ResourceGroupName"]
     $VmNameArray = $UserInputs["VmNameArray"]
@@ -916,50 +1386,78 @@ function Start-CopyKeys
     $TargetBekVault = $UserInputs["TargetBekVault"]
     $TargetKekVault = $UserInputs["TargetKekVault"]
 
-    if($Context -eq $null)
-      {
-        $Context = Get-AzContext
-      }
 
-    Write-Verbose "`nSubscription Id: $($Context.Subscription.Id)"
-    Write-Verbose "Inputs:`n$(ConvertTo-Json -InputObject $UserInputs)"
+    if($null -eq $Context)
+    {
+        $Context = Get-AzContext
+    }
+
+    $OutputLogger.Log(
+        $MyInvocation,
+        "SubscriptionId: $($Context.Subscription.Id)",
+        [LogType]::INFO)
+    $OutputLogger.LogObject(
+        $MyInvocation,
+        $UserInputs,
+        "User inputs.",
+        [LogType]::INFO)
 
     $TenantId = $Context.Tenant.Id
-    $AuthResult = Get-Authentication
-    $AccessToken = $AuthResult.AccessToken
-    $UserId = $AuthResult.UserInfo.UniqueId
+    $AccessToken = (Get-AzAccessToken -ResourceTypeName KeyVault).Token
+    $UserPrincipalName = (Get-AzContext).Account.Id
+    $UserId = (Get-AzAdUser -UserPrincipalName $UserPrincipalName).Id
 
-    Write-Debug "`nStarting CopyKeys for UserId: $UserId`n"
+    $OutputLogger.Log(
+        $MyInvocation,
+        "`nStarting CopyKeys for UserId: $UserId, UserPrincipalName: $UserPrincipalName",
+        [LogType]::OUTPUT)
 
     $IsFirstBekVault = $IsFirstKekVault = $true
     $FirstBekVault = $FirstKekVault = $null
     $IsBekKeyVaultNew = $IsKekKeyVaultNew = $false
 
-    $OutputLogger.WriteLine("SubscriptionId: $($Context.Subscription.Id)")
-    $OutputLogger.WriteLine("ResourceGroupName: $ResourceGroupName")
-    $OutputLogger.WriteLine("TargetLocation: $TargetLocation")
+    $SourceList = New-Sources -VmArray $VmNameArray -SourceResourceGroupName $ResourceGroupName
 
-    foreach($VmName in $VmNameArray)
+    foreach($Source in $SourceList)
     {
         try
         {
-            $Vm = Get-AzVM -Name $VmName -ResourceGroupName $ResourceGroupName
-            $OutputLogger.WriteLine("`nVMName: $VmName")
+            $VmName = $Source.Name
 
-            $Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
-            $Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
+            # Only VMName as source name if 2 pass else VMName - DiskName
+            $SourceName = if ([string]::IsNullOrEmpty($Source.DiskName)) { $Source.Name } else `
+                { $Source.Name + " - " + $Source.DiskName }
+
+            # If output diskName is empty -> 2-pass else 1-pass
+            $OutputLogger.LogObject(
+                $MyInvocation,
+                $Source,
+                "Source information.",
+                [LogType]::INFO)
+
+            $Bek = $Source.Bek
+            $Kek = $Source.Kek
 
             if (-not $Bek)
             {
-                throw [System.MissingFieldException] "Virtual machine $VmName encrypted but disk encryption key " + `
-                    "details missing."
+                throw [Errors]::DiskEncryptionInfoMissing($VmName, $Source.DiskName)
             }
 
             $BekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Bek -SourcePermissions `
                 $SourceSecretsPermissions -Secret
 
-            $OutputLogger.WriteLine("SourceBEKVault: $($BekKeyVaultResource.Name)")
-            $OutputLogger.WriteLine("SourceBEKId: $($Bek.SecretUrl)")
+            $OutputLogger.Log(
+                $MyInvocation,
+                "VM/Disk name: $SourceName",
+                [LogType]::OUTPUT)
+            $OutputLogger.Log(
+                $MyInvocation,
+                "SourceBEKVault: $($BekKeyVaultResource.Name)",
+                [LogType]::OUTPUT)
+            $OutputLogger.Log(
+                $MyInvocation,
+                "SourceBEKId: $($Bek.SecretUrl)",
+                [LogType]::OUTPUT)
 
             if ($IsFirstBekVault)
             {
@@ -975,6 +1473,13 @@ function Start-CopyKeys
             $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
                 -Name $Url.Segments[2].TrimEnd("/")
             $BekSecretBase64 = $BekSecret.SecretValueText
+
+            if ([string]::IsNullOrEmpty($BekSecretBase64))
+            {
+                $BekSecretBase64 = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
+                -Name $Url.Segments[2].TrimEnd("/") -AsPlainText
+            }
+
             $BekTags = $BekSecret.Attributes.Tags
 
             if ($Kek)
@@ -982,8 +1487,18 @@ function Start-CopyKeys
                 $KekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Kek `
                     -SourcePermissions $SourceKeysPermissions
 
-                $OutputLogger.WriteLine("SourceKEKVault: $($KekKeyVaultResource.Name)")
-                $OutputLogger.WriteLine("SourceKEKId: $($Kek.KeyUrl)")
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "VM/Disk name: $SourceName",
+                    [LogType]::OUTPUT)
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "SourceKEKVault: $($KekKeyVaultResource.Name)",
+                    [LogType]::OUTPUT)
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "SourceKEKId: $($Kek.KeyUrl)",
+                    [LogType]::OUTPUT)
 
                 if ($IsFirstKekVault)
                 {
@@ -995,7 +1510,7 @@ function Start-CopyKeys
                         # In case of new target key vault, initially encrypt and create permissions are given
                         # which are then updated with all actual permissions during Copy-AccessPolicies
                         Set-AzKeyVaultAccessPolicy -VaultName $TargetKekVault -ObjectId $UserId `
-                            -PermissionsToKeys 'Encrypt','Create','Get'
+                            -PermissionsToKeys $TargetKeysPermissions
                     }
 
                     $FirstKekVault = $KekKeyVaultResource
@@ -1010,8 +1525,10 @@ function Start-CopyKeys
 
                 if(-not $Kekkey)
                 {
-                    throw "Key with name: $($Url.Segments[2].TrimEnd("/"))" + `
-                        "and version: $($Url.Segments[3]) could not be found in key vault $($KekKeyVaultResource.Name)"
+                    throw [Errors]::KeyMissing(
+                        $Url.Segments[2].TrimEnd("/"),
+                        $Url.Segments[3],
+                        $KekKeyVaultResource.Name)
                 }
 
                 $NewKekKey = Get-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
@@ -1022,16 +1539,29 @@ function Start-CopyKeys
                     # Creating the new KEK
                     $NewKekKey = Add-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
                         -Destination Software
-                    Write-Host 'Copying "Key Encryption Key" for' "$VmName" -ForegroundColor Green
+
+                    $OutputLogger.Log(
+                        $MyInvocation,
+                        "Copying 'Key Encryption Key' for '$SourceName'",
+                        [LogType]::OUTPUT)
                 }
                 else
                 {
                     # Using existing KEK
-                    Write-Host "Using existing key $($KekKey.Name)" -ForegroundColor Green
+                    $OutputLogger.Log(
+                        $MyInvocation,
+                        "Using existing key $($KekKey.Name) for '$SourceName'.",
+                        [LogType]::OUTPUT)
                 }
 
-                $OutputLogger.WriteLine("TargetKEKVault: $TargetKekVault")
-                $OutputLogger.WriteLine("TargetKEKId: $($NewKekKey.Id)")
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "TargetKEKVault: $TargetKekVault",
+                    [LogType]::INFO)
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "TargetKEKId: $($NewKekKey.Id)",
+                    [LogType]::INFO)
 
                 $TargetKekUri = "https://" + "$TargetKekVault" + ".vault.azure.net/keys/" + $NewKekKey.Name + '/' + `
                     $NewKekKey.Version
@@ -1045,24 +1575,29 @@ function Start-CopyKeys
                     $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $TargetKekUri
 
                 $BekTags.DiskEncryptionKeyEncryptionKeyURL = $TargetKekUri
-                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"  -Logger $OutputLogger
+                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"
             }
             else
             {
-                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK" -Logger $OutputLogger
+                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK"
             }
 
-            $CompletedList += $VmName
+            $CompletedList += $SourceName
         }
         catch
         {
-            Write-Warning "CopyKeys not completed for $VmName`n"
-            $IncompleteList[$VmName] = $_
+            Write-Warning "CopyKeys not completed for $SourceName`n`n"
+            $IncompleteList[$SourceName] = $_
         }
     }
 
     if ($IsKekKeyVaultNew)
     {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Copying access policies from $($FirstKekVault.Name) to $TargetKekVault.",
+            [LogType]::INFO)
+
         # Copying access policies to new KEK target key vault
         $TargetKekRgName = "$($FirstKekVault.ResourceGroupName)" + "-asr"
         Copy-AccessPolicies -TargetKeyVaultName $TargetKekVault -TargetResourceGroupName $TargetKekRgName `
@@ -1072,6 +1607,11 @@ function Start-CopyKeys
 
     if ($IsBekKeyVaultNew)
     {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Copying access policies from $($FirstBekVault.Name) to $TargetBekVault.",
+            [LogType]::INFO)
+
         # Copying access policies to new BEK target key vault
         $TargetBekRgName = "$($FirstBekVault.ResourceGroupName)" + "-asr"
         Copy-AccessPolicies -TargetKeyVaultName $TargetBekVault -TargetResourceGroupName $TargetBekRgName `
@@ -1083,6 +1623,7 @@ function Start-CopyKeys
 }
 
 $ErrorActionPreference = "Stop"
+$DebugPreference = "SilentlyContinue"
 $SourceSecretsPermissions = @('get')
 $TargetSecretsPermissions = @('set')
 $SourceKeysPermissions = @('get', 'decrypt')
@@ -1090,68 +1631,53 @@ $TargetKeysPermissions = @('get', 'create', 'encrypt')
 
 try
 {
-    $StartTime = Get-Date -Format 'dd-MM-yyyy-HH-mm-ss-fff'
-    Write-Verbose "$StartTime - CopyKeys started"
+    $StartTime = Get-Date -Format 'dd-MM-yyyy-HH-mm-ss'
     $CompletedList = @()
-    $DebugLogger = $null
     $IncompleteList = New-Object System.Collections.Hashtable
+    $OutputLogger = [Logger]::new('CopyKeys-' + $StartTime, $FilePath)
+    $OutputLogger.Log(
+        $MyInvocation,
+        "CopyKeys started - $StartTime.",
+        [LogType]::INFO)
 
-    if ($ForceDebug)
-    {
-        $Script:DebugPreference = "SilentlyContinue"
-        $DebugLogger = [Logger]::new('CopyKeysDebug-' + $StartTime, $FilePath)
-        $CompletedList = Start-CopyKeys 5> $DebugLogger.GetFullPath()
-    }
-    else
-    {
-        $CompletedList = Start-CopyKeys
-    }
+    $CompletedList = Start-CopyKeys
 }
 catch
 {
-    $UnknownError = "`nException: " + $PSItem.Exception.Message + `
-        "`nAt: " + $PSItem.InvocationInfo.Line.Trim() + `
-        "Line: " + $PSItem.InvocationInfo.ScriptLineNumber + "; Char:" + $PSItem.InvocationInfo.OffsetInLine + `
-        "`nStackTrace: `n" + $PSItem.ScriptStackTrace + `
-        "`nCategoryInfo: " + $PSItem.CategoryInfo.Category + ": " + $PSItem.CategoryInfo.Activity + ", " + `
-            $PSItem.CategoryInfo.Reason + `
-        "`nAn unknown exception occurred. Please contact support with the error details"
+    $UnknownError = (Out-String -InputObject $PSItem)
     Write-Host -ForegroundColor Red -BackgroundColor Black $UnknownError
 
-    if($DebugLogger -ne $null)
-    {
-        $DebugLogger.WriteLine("`nERROR: " + $UnknownError)
-    }
+    $OutputLogger.LogObject(
+        $MyInvocation,
+        $PSItem,
+        "Unknown error",
+        [LogType]::ERROR)
 }
 finally
 {
     # Summarizes the CopyKeys status for various Vms
     if($CompletedList.Count -gt 0)
     {
-        Write-Host -ForegroundColor Green "`nCopyKeys succeeded for VMs - $($CompletedList -join ', ')."
-
-        if($DebugLogger -ne $null)
-        {
-            $DebugLogger.WriteLine("`nCopyKeys succeeded for VMs - $($CompletedList -join ', ').")
-        }
+        $OutputLogger.Log(
+            $MyInvocation,
+            "`nCopyKeys succeeded for VMs:`n`t $($CompletedList -join "`n`t").",
+            [LogType]::OUTPUT)
     }
-    $IncompleteList.Keys | % {
-        Write-Host -ForegroundColor Green "`nCopyKeys failed for $_ with"
-        $KnownError = "Exception: " + $IncompleteList[$_].Exception.Message + `
-        "`nAt: " + $IncompleteList[$_].InvocationInfo.Line.Trim() + `
-        "Line: " + $IncompleteList[$_].InvocationInfo.ScriptLineNumber + "; Char:" + `
-            $IncompleteList[$_].InvocationInfo.OffsetInLine + `
-        "`nStackTrace: `n" + $IncompleteList[$_].ScriptStackTrace + `
-        "`nCategoryInfo: " + $IncompleteList[$_].CategoryInfo.Category + ": " + `
-            $IncompleteList[$_].CategoryInfo.Activity + ", " + $IncompleteList[$_].CategoryInfo.Reason
+    $IncompleteList.Keys | ForEach-Object {
+        Write-Host -ForegroundColor Yellow "`nCopyKeys failed for $_ with - `n"
+        $KnownError = Out-String -InputObject $IncompleteList[$_]
         Write-Host -ForegroundColor Red -BackgroundColor Black $KnownError
 
-        if($DebugLogger -ne $null)
-        {
-            $DebugLogger.WriteLine("`nCopyKeys failed for $_ with" + "`nERROR: " + $KnownError)
-        }
-
+        $OutputLogger.LogObject(
+            $MyInvocation,
+            $IncompleteList[$_],
+            "CopyKeys failed for $_.",
+            [LogType]::ERROR)
     }
 
-    Write-Verbose "$(Get-Date -Format 'dd/MM/yyyy HH:mm:ss:fff') - CopyKeys completed"
+    $EndTime = Get-Date -Format 'dd/MM/yyyy HH:mm:ss'
+    $OutputLogger.Log(
+        $MyInvocation,
+        "CopyKeys completed - $EndTime.",
+        [LogType]::INFO)
 }
