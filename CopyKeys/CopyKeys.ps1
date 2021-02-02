@@ -1350,7 +1350,7 @@ function Create-Secret(
 
     $OutputLogger.Log(
         $MyInvocation,
-        "Copying 'Disk Encryption Key' for '$VmName'.",
+        "Copying 'Disk Encryption Key' for '$SourceName'.",
         [LogType]::OUTPUT)
     $OutputLogger.Log(
         $MyInvocation,
@@ -1448,6 +1448,10 @@ function Start-CopyKeys
 
             $OutputLogger.Log(
                 $MyInvocation,
+                "VM/Disk name: $SourceName",
+                [LogType]::OUTPUT)
+            $OutputLogger.Log(
+                $MyInvocation,
                 "SourceBEKVault: $($BekKeyVaultResource.Name)",
                 [LogType]::OUTPUT)
             $OutputLogger.Log(
@@ -1483,6 +1487,10 @@ function Start-CopyKeys
                 $KekKeyVaultResource = Conduct-SourceKeyVaultPreReq -EncryptionKey $Kek `
                     -SourcePermissions $SourceKeysPermissions
 
+                $OutputLogger.Log(
+                    $MyInvocation,
+                    "VM/Disk name: $SourceName",
+                    [LogType]::OUTPUT)
                 $OutputLogger.Log(
                     $MyInvocation,
                     "SourceKEKVault: $($KekKeyVaultResource.Name)",
@@ -1534,7 +1542,7 @@ function Start-CopyKeys
 
                     $OutputLogger.Log(
                         $MyInvocation,
-                        "Copying 'Key Encryption Key' for '$VmName'",
+                        "Copying 'Key Encryption Key' for '$SourceName'",
                         [LogType]::OUTPUT)
                 }
                 else
@@ -1542,7 +1550,7 @@ function Start-CopyKeys
                     # Using existing KEK
                     $OutputLogger.Log(
                         $MyInvocation,
-                        "Using existing key $($KekKey.Name)",
+                        "Using existing key $($KekKey.Name) for '$SourceName'.",
                         [LogType]::OUTPUT)
                 }
 
@@ -1550,7 +1558,6 @@ function Start-CopyKeys
                     $MyInvocation,
                     "TargetKEKVault: $TargetKekVault",
                     [LogType]::INFO)
-
                 $OutputLogger.Log(
                     $MyInvocation,
                     "TargetKEKId: $($NewKekKey.Id)",
