@@ -39,7 +39,7 @@
             }
         },
         "policyName": {
-            "defaultValue": "AzureToAzureReplicationPolicy",
+            "defaultValue": "24-hour-replication-policy",
             "type": "String",
             "metadata": {
                 "description": "Name of the Replication policy to be used to create a new replication policy if protection containers are not mapped."
@@ -79,8 +79,8 @@
             "defaultValue": "Standard_LRS",
             "allowedValues":[
                 "Standard_LRS",
-                "Standard_GRS",
-                "Standard_RAGRS"
+                "Premium_LRS",
+                "StandardSSD_LRS"
             ],
             "type": "String",
             "metadata": {
@@ -91,8 +91,8 @@
             "defaultValue": "Standard_LRS",
             "allowedValues":[
                 "Standard_LRS",
-                "Standard_GRS",
-                "Standard_RAGRS"
+                "Premium_LRS",
+                "StandardSSD_LRS"
             ],
             "type": "String",
             "metadata": {

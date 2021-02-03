@@ -13,8 +13,8 @@ Executing this script will deploy a Powershell Script of name "FailoverAndReprot
 Prior to running this ARM template, following things need to be taken care:
 
 - There exists no resource of the name "FailoverAndReprotect" in the resource group
-- You need one or more Protected Azure VMs.
-- Review VM [compute](azure-to-azure-support-matrix.md#replicated-machines---compute-settings), [storage](azure-to-azure-support-matrix.md#replicated-machines---storage), and [networking](azure-to-azure-support-matrix.md#replicated-machines---networking) requirements.
+- You need one or more Azure VMs. Verify that [Windows](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#windows) or [Linux](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---linux-file-systemguest-storage) VMs are supported.
+- Review VM [compute](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---compute-settings), [storage](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---storage), and [networking](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---networking) requirements.
 
 ## Inputs Required
 
