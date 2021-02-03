@@ -6,7 +6,7 @@ This ARM template triggers Failover and Reprotect operations for ASR Protected I
 
 ## Solution overview and deployed resources
 
-Executing this script will deploy a Powershell Script of name "FailoverAndReprotect" and then trigger it. After triggering, Azure VMs will get failed over to their configured recovery region, and re-protected back to source.
+Executing this template will deploy a Powershell Script of name "FailoverAndReprotect" and then trigger it. After triggering, Azure VMs will get failed over to their configured recovery region, and re-protected back to source.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ The template expects the following inputs:
 | vaultName| Name of the Vault |
 | primaryRegion| Primary Region of the VMs |
 | recoveryRegion| Target Region of the VMs |
-| sourceVmARMIdsCSV| Comma Separated List of Azure VM ARM IDs|
+| sourceVmARMIds| Comma Separated List of Azure VM ARM IDs|
 | recoveryStagingStorageAccount | ARM ID of the storage account used to cache replication data in the source region.|
 | recoveryReplicaDiskAccountType| Type of the Storage account to be used for Disk used for replication.|
 | recoveryTargetDiskAccountType| Type of the Storage account to be used for Recovery Target Disk.|

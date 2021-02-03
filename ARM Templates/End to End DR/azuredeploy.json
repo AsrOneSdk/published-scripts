@@ -45,7 +45,7 @@
                 "description": "Name of the Replication policy to be used to create a new replication policy if protection containers are not mapped."
             }
         },
-        "sourceVmARMIdsCSV": {
+        "sourceVmARMIds": {
             "type": "String",
             "metadata": {
                 "description": "ARM IDs of the Source VMs separated by comma."

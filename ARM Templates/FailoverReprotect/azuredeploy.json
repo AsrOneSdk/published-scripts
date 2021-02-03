@@ -38,7 +38,7 @@
                 "description": "The designated disaster recovery region where virtual machines would be brought up after failover."
             }
         },
-        "sourceVmARMIdsCSV": {
+        "sourceVmARMIds": {
             "type": "String",
             "metadata": {
                 "description": "ARM IDs of the Source VMs separated by comma."

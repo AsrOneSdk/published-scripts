@@ -38,7 +38,7 @@
               "description": "The designated disaster recovery region where virtual machines would be brought up after failover."
           }
       },
-      "sourceVmARMIdsCSV": {
+      "sourceVmARMIds": {
             "value": "GEN-UNIQUE-32",
            "metadata": {
             "description": "Comma Separated List of Azure VM ARM IDs."

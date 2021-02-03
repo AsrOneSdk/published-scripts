@@ -21,7 +21,7 @@ This ARM template enables Site Recovery customers to run End to End DR Scenarios
 
 ## Solution overview and deployed resources
 
-Executing this script will deploy and trigger three Powershell Scripts of name "Enable-Replication", "FailoverAndReprotect", and "FailbackAndReprotect". After triggering, Azure VMs will go through the following sequence of events:
+Executing this template will deploy and trigger three Powershell Scripts of name "Enable-Replication", "FailoverAndReprotect", and "FailbackAndReprotect". After triggering, Azure VMs will go through the following sequence of events:
 
 - All the specified Azure VMs will get Protected by ASR (_Enable Protection_).
 - After they're successfully protected, the VMs will failover to the DR Region and then reprotected back to the source (_Failover and Reprotect_)
@@ -50,7 +50,7 @@ The template expects the following inputs:
 | primaryRegion| Primary Region of the VMs |
 | recoveryRegion| Target Region of the VMs |
 | policyName| Preferred Policy Name for the DR VMs.|
-| sourceVmARMIdsCSV| Comma Separated List of Azure VM ARM IDs|
+| sourceVmARMIds| Comma Separated List of Azure VM ARM IDs|
 | targetResourceGroupId| ARM ID of the Resource Group to create VMs in the DR Region.|
 | targetVirtualNetworkId| ARM ID of the Virtual Network to be used by VMs in the DR Region.|
 | primaryStagingStorageAccount | ARM ID of the storage account used to cache replication data in the source region.|

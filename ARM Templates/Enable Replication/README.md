@@ -6,7 +6,7 @@ This ARM template enables Site Recovery customers to Enable Replication at scale
 
 ## Solution overview and deployed resources
 
-Executing this script will deploy a Powershell Script of name "Enable-Replication" and then trigger it. After triggering, Azure VMs will be protected against the Recovery Services Vault.
+Executing this template will deploy a Powershell Script of name "Enable-Replication" and then trigger it. After triggering, Azure VMs will be protected against the Recovery Services Vault.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ The template expects the following inputs:
 | primaryRegion| Primary Region of the VMs |
 | recoveryRegion| Target Region of the VMs |
 | policyName| Preferred Policy Name for the DR VMs.|
-| sourceVmARMIdsCSV| Comma Separated List of Azure VM ARM IDs|
+| sourceVmARMIds| Comma Separated List of Azure VM ARM IDs|
 | targetResourceGroupId| ARM ID of the Resource Group to create VMs in the DR Region.|
 | targetVirtualNetworkId| ARM ID of the Virtual Network to be used by VMs in the DR Region.|
 | primaryStagingStorageAccount | ARM ID of the storage account used to cache replication data in the source region.|

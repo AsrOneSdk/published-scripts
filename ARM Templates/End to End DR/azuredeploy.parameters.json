@@ -44,7 +44,7 @@
                 "description": "Name of the Replication policy to be used to create a new replication policy if protection containers are not mapped."
             }
         },
-      "sourceVmARMIdsCSV": {
+      "sourceVmARMIds": {
             "value": "GEN-UNIQUE-32",
            "metadata": {
             "description": "Comma Separated List of Azure VM ARM IDs."
