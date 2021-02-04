@@ -1,0 +1,183 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "identity": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM ID of a user managed identity that has contributor access to the source, target, and the resource group where the template is being deployed."
+            }
+        },
+        "vaultSubscriptionId": {
+            "type": "String",
+            "metadata": {
+                "description": "Subscription Id of the Recovery Services Vault."
+            }
+        },
+        "vaultName": {
+            "type": "String",
+            "metadata": {
+                "description": "Name of the Recovery Services Vault to be used."
+            }
+        },
+        "vaultResourceGroupName": {
+            "type": "String",
+            "metadata": {
+                "description": "Resource Group Name of the Recovery Services Vault."
+            }
+        },
+        "primaryRegion": {
+            "type": "String",
+            "metadata": {
+                "description": "The region where the original source virtual machines are deployed."
+            }
+        },
+        "recoveryRegion": {
+            "type": "String",
+            "metadata": {
+                "description": "The designated disaster recovery region where virtual machines would be brought up after failover."
+            }
+        },
+        "policyName": {
+            "defaultValue": "24-hour-replication-policy",
+            "type": "String",
+            "metadata": {
+                "description": "Name of the Replication policy to be used to create a new replication policy if protection containers are not mapped."
+            }
+        },
+        "sourceVmARMIds": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM IDs of the Source VMs separated by comma."
+            }
+        },
+        "targetResourceGroupId": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM ID of the resource group to be used to create virtual machine in DR region."
+            }
+        },
+        "targetVirtualNetworkId": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM ID of the virtual network to be used by virtual machine in DR region."
+            }
+        },
+        "primaryStagingStorageAccount": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM ID of the storage account to be used to cache replication data in the source region."
+            }
+        },
+        "recoveryStagingStorageAccount": {
+            "type": "String",
+            "metadata": {
+                "description": "ARM ID of the storage account to be used to cache replication data in the DR region (for Reprotect operation)."
+            }
+        },
+        "recoveryReplicaDiskAccountType": {
+            "defaultValue": "Standard_LRS",
+            "allowedValues":[
+                "Standard_LRS",
+                "Premium_LRS",
+                "StandardSSD_LRS"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "Type of the Storage account to be used for Disk used for replication."
+            }
+        },
+        "recoveryTargetDiskAccountType": {
+            "defaultValue": "Standard_LRS",
+            "allowedValues":[
+                "Standard_LRS",
+                "Premium_LRS",
+                "StandardSSD_LRS"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "Type of the Storage account to be used for Recovery Target Disk."
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2020-10-01",
+            "name": "EnableReplication",
+            "location": "[resourceGroup().location]",
+            "kind": "AzurePowerShell",
+            "identity": {
+                "type": "userAssigned",
+                "userAssignedIdentities": {
+                    "[parameters('identity')]": {}
+                }
+            },
+            "properties": {
+                "forceUpdateTag": "[utcNow()]",
+                "azPowerShellVersion": "3.0",
+                "timeout": "PT4H",
+                "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('vaultSubscriptionId'), ' ', '-vaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-vaultName', ' ', parameters('vaultName'), ' ', '-primaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-recoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ', '-policyName', ' ', parameters('policyName'), ' ', '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIds'), '\\\" ','-TargetResourceGroupId', ' ', parameters('targetResourceGroupId'), ' ', '-TargetVirtualNetworkId', ' ', parameters('targetVirtualNetworkId'),' ', '-PrimaryStagingStorageAccount', ' ', parameters('primaryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
+                "primaryScriptURI": "https://raw.githubusercontent.com/AsrOneSdk/published-scripts/master/AzureSiteRecovery-Automation-EndToEnd-Templates/Powershell-Scripts/Enable-Replication.ps1",
+                "cleanupPreference": "Always",
+                "retentionInterval": "P1D"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2019-10-01-preview",
+            "name": "FailoverAndReprotect",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "EnableReplication"
+            ],
+            "kind": "AzurePowerShell",
+            "identity": {
+                "type": "userAssigned",
+                "userAssignedIdentities": {
+                    "[parameters('identity')]": {}
+                }
+            },
+            "properties": {
+                "forceUpdateTag": "[utcNow()]",
+                "azPowerShellVersion": "3.0",
+                "timeout": "PT4H",
+                "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('VaultSubscriptionId'), ' ', '-VaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-VaultName', ' ', parameters('vaultName'), ' ', '-PrimaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-RecoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ', '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIds'), '\\\" ', '-RecoveryStagingStorageAccount', ' ', parameters('recoveryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
+                "primaryScriptURI": "https://raw.githubusercontent.com/AsrOneSdk/published-scripts/master/AzureSiteRecovery-Automation-EndToEnd-Templates/Powershell-Scripts/Failover-Reprotect.ps1",
+                "cleanupPreference": "Always",
+                "retentionInterval": "P1D"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2019-10-01-preview",
+            "name": "FailbackAndReprotect",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "FailoverAndReprotect"
+            ],
+            "kind": "AzurePowerShell",
+            "identity": {
+                "type": "userAssigned",
+                "userAssignedIdentities": {
+                    "[parameters('identity')]": {}
+                }
+            },
+            "properties": {
+                "forceUpdateTag": "[utcNow()]",
+                "azPowerShellVersion": "3.0",
+                "timeout": "PT4H",
+                "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('VaultSubscriptionId'), ' ', '-VaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-VaultName', ' ', parameters('vaultName'), ' ', '-PrimaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-RecoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ',  '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIds'), '\\\" ', '-DrVMArmIdsCSV', ' \\\"', reference('FailoverAndReprotect').outputs.DrVmArmIds, '\\\" ', '-PrimaryStagingStorageAccount', ' ', parameters('primaryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
+                "primaryScriptURI": "https://raw.githubusercontent.com/AsrOneSdk/published-scripts/master/AzureSiteRecovery-Automation-EndToEnd-Templates/Powershell-Scripts/Fallback-Reprotect.ps1",
+                "cleanupPreference": "Always",
+                "retentionInterval": "P1D"
+            }
+        }
+    ],
+    "outputs": {
+        "result": {
+            "type": "String",
+            "value": "[reference('FailoverAndReprotect').outputs.ReProtectedItemArmIds]"
+        }
+    }
+}
