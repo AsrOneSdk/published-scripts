@@ -12,7 +12,7 @@ Executing this template will deploy a Powershell Script of name "FailoverAndRepr
 
 Prior to running this ARM template, following things need to be taken care:
 
-- There exists no resource of the name "FailoverAndReprotect" in the resource group
+- There exists no resource of the name "FailoverAndReprotect" in the resource group where the template is being deployed.
 - You need one or more Azure VMs. Verify that [Windows](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#windows) or [Linux](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---linux-file-systemguest-storage) VMs are supported.
 - Review VM [compute](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---compute-settings), [storage](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---storage), and [networking](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---networking) requirements.
 
@@ -21,7 +21,7 @@ Prior to running this ARM template, following things need to be taken care:
 The template expects the following inputs:
 | Parameters| Description|
 |-|-|
-|identity|ARM ID of a user managed identity that has contributor access to the resource group being deployed.|
+|identity|ARM ID of a user managed identity that has contributor access to the source, target, and the resource group where the template is being deployed.|
 | vaultSubscriptionId| Subscription Id of the Subscription where Vault is present|
 | vaultResourceGroupName| Name of the Resource Group where the Vault is present|
 | vaultName| Name of the Vault |

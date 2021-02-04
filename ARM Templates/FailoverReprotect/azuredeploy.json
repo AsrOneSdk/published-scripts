@@ -5,7 +5,7 @@
         "identity": {
             "type": "String",
             "metadata": {
-                "description": "ARM ID of a user managed identity that has contributor access to the resource group being deployed."
+                "description": "ARM ID of a user managed identity that has contributor access to the source, target, and the resource group where the template is being deployed."
             }
         },
         "vaultSubscriptionId": {
@@ -92,7 +92,7 @@
                 "forceUpdateTag": "[utcNow()]",
                 "azPowerShellVersion": "3.0",
                 "timeout": "PT4H",
-                "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('VaultSubscriptionId'), ' ', '-VaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-VaultName', ' ', parameters('vaultName'), ' ', '-PrimaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-RecoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ', '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIdsCSV'), '\\\" ', '-RecoveryStagingStorageAccount', ' ', parameters('recoveryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
+                "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('VaultSubscriptionId'), ' ', '-VaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-VaultName', ' ', parameters('vaultName'), ' ', '-PrimaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-RecoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ', '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIds'), '\\\" ', '-RecoveryStagingStorageAccount', ' ', parameters('recoveryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
                 "primaryScriptURI": "https://raw.githubusercontent.com/AsrOneSdk/published-scripts/master/AzureSiteRecovery-Automation-EndToEnd-Templates/Powershell-Scripts/Failover-Reprotect.ps1",
                 "cleanupPreference": "Always",
                 "retentionInterval": "P1D"

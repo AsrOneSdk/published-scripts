@@ -12,7 +12,7 @@ Executing this template will deploy a Powershell Script of name "Enable-Replicat
 
 Prior to running this ARM template, following things need to be taken care:
 
-- There exists no resource of the name "Enable-Replication" in the resource group
+- There exists no resource of the name "Enable-Replication" in the resource group where the template is being deployed.
 - A Recovery Services Vault should exist. Please refer [here](https://docs.microsoft.com/azure/site-recovery/quickstart-create-vault-template) to create one.
 - [Review supported regions](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#region-support). You can set up disaster recovery for Azure VMs between any two regions in the same geography.
 - You need one or more Azure VMs. Verify that [Windows](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#windows) or [Linux](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---linux-file-systemguest-storage) VMs are supported.
@@ -24,7 +24,7 @@ Prior to running this ARM template, following things need to be taken care:
 The template expects the following inputs:
 | Parameters| Description|
 |-|-|
-|identity|ARM ID of a user managed identity that has contributor access to the resource group being deployed.|
+|identity|ARM ID of a user managed identity that has contributor access to the source, target, and the resource group where the template is being deployed.|
 | vaultSubscriptionId| Subscription Id of the Subscription where Vault is present|
 | vaultResourceGroupName| Name of the Resource Group where the Vault is present|
 | vaultName| Name of the Vault |
