@@ -24,7 +24,7 @@ Prior to running this ARM template, please ensure:
 - [Review supported regions](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix.md#region-support). You can set up disaster recovery for Azure VMs between any two regions in the same geography.
 - You need one or more Azure VMs. Verify that [Windows](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#windows) or [Linux](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---linux-file-systemguest-storage) VMs are supported.
 - Review VM [compute](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---compute-settings), [storage](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---storage), and [networking](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-support-matrix#replicated-machines---networking) requirements.
-- This tutorial presumes that VMs aren't encrypted. If you want to set up disaster recovery for encrypted VMs, [follow this article](azure-to-azure-how-to-enable-replication-ade-vms.md)
+- This tutorial presumes that VMs aren't encrypted. If you want to set up disaster recovery for encrypted VMs, [follow this article](https://docs.microsoft.com/azure/site-recovery/azure-to-azure-how-to-enable-replication-ade-vms)
 
 ## Inputs Required
 
