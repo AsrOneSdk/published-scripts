@@ -760,11 +760,15 @@ function Add-CommonFormatting(
     [System.Collections.Hashtable] $Formattings)
 {
     $UiObject.Enabled = $false
-    $UiObject.Font = 'Microsoft Sans Serif, 10'
+    $UiObject.Font = "Microsoft Sans Serif, 10"
     $UiObject.ForeColor = "#5c7290"
-    $UiObject.width = $Formattings["width"]
-    $UiObject.height = $Formattings["height"]
-    $UiObject.location = New-Object System.Drawing.Point($Formattings["location"])
+    $UiObject.width = $Formattings["width"] * $WidthRatio
+    $UiObject.height = $Formattings["height"] * $HeightRatio
+
+    $UiObject.location =
+        New-Object System.Drawing.Point(
+            $($Formattings["location"][0] * $WidthRatio),
+            $($Formattings["location"][1] * $HeightRatio))
 }
 
 ### <summary>
@@ -772,6 +776,10 @@ function Add-CommonFormatting(
 ### </summary>
 function Generate-UserInterface
 {
+    $Size = [System.Windows.Forms.SystemInformation]::PrimaryMonitorSize
+    $WidthRatio = [Convert]::ToInt32($Size.Width/1620)
+    $HeightRatio = [Convert]::ToInt32($Size.Height/1080)
+
     $UserInputForm = New-Object System.Windows.Forms.Form
     $SubscriptionLabel = New-Object System.Windows.Forms.Label
     $SubscriptionDropDown = New-Object System.Windows.Forms.ComboBox
@@ -800,10 +808,11 @@ function Generate-UserInterface
 
     # Applying formatting to various UI objects
 
-    $UserInputForm.ClientSize = '445,620'
+    $UserInputForm.ClientSize = "$(445*$WidthRatio), $(620*$HeightRatio)"
     $UserInputForm.text = "User Inputs"
     $UserInputForm.BackColor = "#ffffff"
     $UserInputForm.TopMost = $false
+    $UserInputForm.AutoScaleMode = 'Font'
 
     $SubscriptionLabelFormatting = @{"location"=@(10, 90); "width"=88; "height"=30}
     Add-CommonFormatting -UiObject $SubscriptionLabel -Formattings $SubscriptionLabelFormatting
@@ -817,14 +826,16 @@ function Generate-UserInterface
     Add-CommonFormatting -UiObject $SubscriptionDropDown -Formattings `
         $SubscriptionDropDownFormatting
     $SubscriptionDropDown.Enabled = $true
-    $SubscriptionDropDown.DropDownHeight = 150
+    $SubscriptionDropDown.DropDownHeight = 150 * $HeightRatio
     $SubscriptionDropDown.AutoSize = $true
+    $SubscriptionDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $SubscriptionDropDown.Add_SelectedIndexChanged({Get-ResourceGroups})
 
     $ResourceGroupDropDownFormatting = @{"location"=@(10, 189); "width"=424; "height"=60}
     Add-CommonFormatting -UiObject $ResourceGroupDropDown -Formattings `
         $ResourceGroupDropDownFormatting
-    $ResourceGroupDropDown.DropDownHeight = 150
+    $ResourceGroupDropDown.DropDownHeight = 150 * $HeightRatio
+    $ResourceGroupDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $ResourceGroupDropDown.Add_SelectedIndexChanged({Get-VirtualMachines})
 
     $ResourceGroupLabelFormatting = @{"location"=@(10, 163); "width"=25; "height"=10}
@@ -837,6 +848,7 @@ function Generate-UserInterface
     $VmListBoxFormatting = @{"location"=@(10, 255); "width"=424; "height"=95}
     Add-CommonFormatting -UiObject $VmListBox -Formattings $VmListBoxFormatting
     $VmListBox.CheckOnClick = $true
+    $VmListBox.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $VmListBox.Add_SelectedIndexChanged({Disable-RestOfOptions})
 
     $VmLabelFormatting = @{"location"=@(10, 233); "width"=25; "height"=10}
@@ -848,7 +860,8 @@ function Generate-UserInterface
 
     $BekDropDownFormatting = @{"location"=@(10, 445); "width"=424; "height"=30}
     Add-CommonFormatting -UiObject $BekDropDown -Formattings $BekDropDownFormatting
-    $BekDropDown.DropDownHeight = 150
+    $BekDropDown.DropDownHeight = 150 * $HeightRatio
+    $BekDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
 
     $BekLabelFormatting = @{"location"=@(10, 420); "width"=25; "height"=10}
     Add-CommonFormatting -UiObject $BekLabel -Formattings $BekLabelFormatting
@@ -859,7 +872,8 @@ function Generate-UserInterface
 
     $KekDropDownFormatting = @{"location"=@(10, 506); "width"=424; "height"=30}
     Add-CommonFormatting -UiObject $KekDropDown -Formattings $KekDropDownFormatting
-    $KekDropDown.DropDownHeight = 150
+    $KekDropDown.DropDownHeight = 150 * $HeightRatio
+    $KekDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
 
     $KekLabelFormatting = @{"location"=@(10, 480); "width"=25; "height"=10}
     Add-CommonFormatting -UiObject $KekLabel -Formattings $KekLabelFormatting
@@ -870,7 +884,8 @@ function Generate-UserInterface
 
     $LocationDropDownFormatting = @{"location"=@(10, 386); "width"=424; "height"=20}
     Add-CommonFormatting -UiObject $LocationDropDown -Formattings $LocationDropDownFormatting
-    $LocationDropDown.DropDownHeight = 150
+    $LocationDropDown.DropDownHeight = 150 * $HeightRatio
+    $LocationDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $LocationDropDown.Add_SelectedIndexChanged({Get-KeyVaults})
 
     $LocationLabelFormatting = @{"location"=@(10, 360); "width"=25; "height"=10}
@@ -894,9 +909,9 @@ function Generate-UserInterface
     $SelectButton.Add_Click({Get-AllSelections})
 
     $MsLogo = New-Object System.Windows.Forms.PictureBox
-    $MsLogo.width = 140
-    $MsLogo.height = 80
-    $MsLogo.location = New-Object System.Drawing.Point(150, 10)
+    $MsLogo.width = 140 * $WidthRatio
+    $MsLogo.height = 80 * $HeightRatio
+    $MsLogo.location = New-Object System.Drawing.Point($(150 * $WidthRatio), $(10 * $HeightRatio))
     $MsLogo.imageLocation = "https://c.s-microsoft.com/en-us/CMSImages/ImgOne.jpg?version=D418E733-821C-244F-37F9-DC865BDEFEC0"
     $MsLogo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::zoom
 
@@ -1369,8 +1384,9 @@ function Create-Secret(
 function Start-CopyKeys
 {
     $Context = Get-AzContext
+    $Subscriptions = Get-AzSubscription -ErrorAction SilentlyContinue
 
-    if($null -eq $Context)
+    if($null -eq $Context -or $null -eq $Subscriptions)
     {
         $SuppressOutput = Login-AzAccount -ErrorAction Stop
     }
