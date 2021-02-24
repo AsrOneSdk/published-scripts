@@ -414,6 +414,17 @@ class Errors
         return "Key with name: $keyName and version: $keyVersion could not be found in key " + `
             "vault $keyVaultName."
     }
+
+    ### <summary>
+    ###  Subscriptions missing.
+    ### </summary>
+    ### <param name="tenantId">Tenant Id.</param>
+    ### <return>Error string.</return>
+    static [string] NoSubscriptionsFound([string] $tenantId)
+    {
+        return "No subscriptions could be found under tenant '$tenantId'. Verify that there " + `
+            "are subscriptions and you're logged in correctly."
+    }
 }
 #EndRegion
 
@@ -917,7 +928,14 @@ function Generate-UserInterface
 
     # Populating the subscription dropdown and launching the form
 
-    [array]$SubscriptionArray = ((Get-AzSubscription).Name | Sort-Object)
+    $Subscriptions = Get-AzSubscription
+
+    if ($null -eq $Subscriptions -or 1 -gt $Subscriptions.Count)
+    {
+        throw [Errors]::NoSubscriptionsFound((Get-AzContext).Tenant.Id)
+    }
+
+    [array]$SubscriptionArray = ($Subscriptions.Name | Sort-Object)
 
     foreach ($Item in $SubscriptionArray)
     {
