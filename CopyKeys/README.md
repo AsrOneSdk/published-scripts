@@ -11,3 +11,4 @@ This script copies the disk encryption keys and key encryption keys for Azure Di
 | Date | Notes |
 |--|--|
 |01/21 | - Improved Authentication mechanism with Get-AzAccessToken.</br> - Removed dependence on deprecated key vault properties.</br> - Improved logging. |
+|02/23 | - Fixed GUI issues in case of varying resolution.</br> - Fixed login bug in case of expired context. |
