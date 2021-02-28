@@ -1597,18 +1597,15 @@ function Start-CopyKeys
                     "TargetKEKId: $($NewKekKey.Id)",
                     [LogType]::INFO)
 
-                $TargetKekUri = "https://" + "$TargetKekVault" + ".vault.azure.net/keys/" + $NewKekKey.Name + '/' + `
-                    $NewKekKey.Version
-
                 # Decrypting Wrapped-BEK
                 $DecryptedSecret = Decrypt-Secret -EncryptedValue $BekSecretBase64 -EncryptedAlgorithm `
                     $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $Kekkey.Key.Kid
 
                 # Encrypting BEK with new KEK
                 $EncryptedSecret = Encrypt-Secret -DecryptedValue $DecryptedSecret.value -EncryptedAlgorithm `
-                    $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $TargetKekUri
+                    $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $NewKekKey.Key.Kid
 
-                $BekTags.DiskEncryptionKeyEncryptionKeyURL = $TargetKekUri
+                $BekTags.DiskEncryptionKeyEncryptionKeyURL = $NewKekKey.Key.Kid
                 Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"
             }
             else
