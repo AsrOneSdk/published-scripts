@@ -7,11 +7,17 @@
 ### the keys to enable replication for these VMs to another region.
 ### </summary>
 ###
+### <param name="AllowResourceMoverAccess">Switch parameter indicating if the MSI created by
+### Azure Resource Mover for moving the selected VM resources need to be given access to the
+### target BEK/KEK key vaults.</param>
 ### <param name="FilePath">Optional parameter defining the location of the output file.</param>
 ### ---------------------------------------------------------------
 
 [CmdletBinding()]
 param(
+    [Parameter(Mandatory = $false,
+               HelpMessage="Location of the output file.")]
+    [switch]$AllowResourceMoverAccess = $false,
     [Parameter(Mandatory = $false,
                HelpMessage="Location of the output file.")]
     [string]$FilePath = $null)
@@ -303,20 +309,31 @@ class Source
 class ConstantStrings
 {
     static [string] $adeExtensionPrefix = "azurediskencryption"
+    static [string] $apiVersion = "api-version"
     static [string] $asrSuffix = "-asr"
     static [string] $authHeader = "authorization"
     static [string] $contentType = "application/json"
+    static [string] $httpGet = "GET"
     static [string] $httpPost = "POST"
     static [int] $keyVaultNameMaxLength = 24
     static [string] $loadingBEK = "Loading target BEK vault"
     static [string] $loadingKEK = "Loading target KEK vault"
     static [string] $loadingRG = "Loading resource groups"
+    static [string] $managementAzureEndpoint = "https://management.azure.com"
+    static [string] $moveResourceType = "moveresources"
     static [string] $newPrefix = "(new)"
     static [string] $noAdeVmInResourceGroup = "Selected resource group does `nnot contain any " + `
         "encrypted VMs."
     static [string] $notApplicable = "Not Applicable"
+    static [string] $providers = "providers"
+    static [string] $resourceGroups = "resourceGroups"
+    static [string] $resourceLinks = "links"
+    static [string] $resourceLinksApiVersion = "2016-09-01"
+    static [string] $resourcesProvider = "Microsoft.Resources"
+    static [string] $scopes = "scopes"
     static [string] $subscriptions = "subscriptions"
     static [string] $tokenType = "Bearer"
+    static [string] $vmType = "virtualmachines"
 }
 #endregion
 
@@ -424,6 +441,60 @@ class Errors
     {
         return "No subscriptions could be found under tenant '$tenantId'. Verify that there " + `
             "are subscriptions and you're logged in correctly."
+    }
+
+
+    ### <summary>
+    ### ARM call failed.
+    ### </summary>
+    ### <param name="exceptionStr">Exception as string.</param>
+    ### <param name="requestStr">Request as string.</param>
+    ### <return>Error string.</return>
+    static [string] ArmCallFailed([string] $exceptionStr, [string] $requestStr)
+    {
+        return "ARM call failed with the following error:`n$exceptionStr" + `
+            "`nThe request information:`n$requestStr."
+    }
+
+    ### <summary>
+    ### Api version missing.
+    ### </summary>
+    ### <return>Error string.</return>
+    static [string] ApiVersionMissing()
+    {
+        return "API version related information is missing."
+    }
+
+    ### <summary>
+    ### URL tokens missing.
+    ### </summary>
+    ### <return>Error string.</return>
+    static [string] UrlTokensMissing()
+    {
+        return "Tokens for URL construction are missing."
+    }
+
+    ### <summary>
+    ### Invalid ARM id input.
+    ### </summary>
+    ### <return>Error string.</return>
+    static [string] InvalidArmIdInput()
+    {
+        return "The resource ARM id input is invalid."
+    }
+
+    ### <summary>
+    ### Invalid label token input.
+    ### </summary>
+    ### <param name="armId">Resource ARM id.</param>
+    ### <param name="tokenCount">Count of tokens.</param>
+    ### <return>Error string.</return>
+    static [string] InvalidLabelTokenInput(
+        [string] $armId,
+        [int] $tokenCount)
+    {
+        return "Labelled tokens cannot be created for ARM id - '$armId', as the token count " +
+            "($tokenCount) is odd."
     }
 }
 #EndRegion
@@ -1054,6 +1125,231 @@ function Decrypt-Secret(
     return $Response
 }
 
+#Region Utilities
+
+### <summary>
+### Extracts the labelled tokens from the ARM id.
+### </summary>
+### <param name="armId">Resource ARM id.</param>
+### <returns>Labelled tokens in lowercase.</returns>
+function Extract-LabelledTokensFromId([string] $armId)
+{
+    if ([string]::IsNullOrEmpty($armId))
+    {
+        throw [Errors]::InvalidArmIdInput()
+    }
+
+    $tokens = $armId.ToLower().Trim('/').Split('/')
+
+    if (($tokens.Count % 2) -ne 0)
+    {
+        throw [Errors]::InvalidLabelTokenInput($armId.ToLower().Trim('/'), $tokens.Count)
+    }
+
+    $labelledTokens = [System.Collections.Hashtable]::New()
+
+    for ($index=0; $index -lt $tokens.Count; $index += 2)
+    {
+        $labelledTokens.Add($tokens[$index], $tokens[$index + 1])
+    }
+
+    return $labelledTokens
+}
+
+### <summary>
+### Extracts the resource name from ARM id.
+### </summary>
+### <param name="armId">Resource ARM id.</param>
+### <returns>Resource name.</returns>
+function Extract-ParentResourceNameFromId([string] $armId)
+{
+    if ([string]::IsNullOrEmpty($armId))
+    {
+        throw [Errors]::InvalidArmIdInput()
+    }
+
+    $tokens = $armId.Trim('/').Split('/')
+
+    if ($tokens.Count -lt 9)
+    {
+        throw [Errors]::InvalidArmIdInput()
+    }
+
+    return $tokens[-3]
+}
+
+### <summary>
+### Extracts the resource group from ARM id.
+### </summary>
+### <param name="armId">Resource ARM id.</param>
+### <returns>Resource group name.</returns>
+function Extract-ResourceGroupFromId([string] $armId)
+{
+    $tokens = Extract-LabelledTokensFromId -ArmId $armId
+
+    return $tokens[[ConstantStrings]::resourceGroups.ToLower()]
+}
+
+### <summary>
+### Extracts the resource name from ARM id.
+### </summary>
+### <param name="armId">Resource ARM id.</param>
+### <returns>Resource name.</returns>
+function Extract-ResourceNameFromId([string] $armId)
+{
+    if ([string]::IsNullOrEmpty($armId))
+    {
+        throw [Errors]::InvalidArmIdInput()
+    }
+
+    $tokens = $armId.Trim('/').Split('/')
+
+    return $tokens[-1]
+}
+
+### <summary>
+### Extracts the resource type from ARM id.
+### </summary>
+### <param name="armId">Resource ARM id.</param>
+### <returns>Resource name.</returns>
+function Extract-ResourceTypeFromId([string] $armId)
+{
+    if ([string]::IsNullOrEmpty($armId))
+    {
+        throw [Errors]::InvalidArmIdInput()
+    }
+
+    $tokens = $armId.Trim('/').Split('/')
+
+    return $tokens[-2]
+}
+
+### <summary>
+### Forms the url string from the tokens passed.
+### </summary>
+### <param name="apiVersion">Api version.</param>
+### <param name="tokens">Url string tokens.</param>
+### <returns>Url string.</returns>
+function Get-UrlString([string] $apiVersion, [string[]]$tokens)
+{
+    if ([string]::IsNullOrEmpty($apiVersion))
+    {
+        throw [Errors]::ApiVersionMissing()
+    }
+
+    if ($null -eq $tokens)
+    {
+        throw [Errors]::UrlTokensMissing()
+    }
+
+    $url = [ConstantStrings]::managementAzureEndpoint + '/'
+    $url += $tokens.Trim('/') -Join '/'
+    $url = $url.Trim('/')
+    $url += '?' + [ConstantStrings]::apiVersion + '=' + $apiVersion
+
+    return $url
+}
+#EndRegion
+
+#Region REST
+
+### <summary>
+### Invokes ARM call in a uniform manner.
+### </summary>
+### <param name="parameters">REST call parameters.</param>
+### <returns>Response.</returns>
+function Invoke-ArmCall($parameters)
+{
+    try
+    {
+        $response = Invoke-RestMethod @parameters
+    }
+    catch
+    {
+        throw [Errors]::ArmCallFailed(
+            $(Out-String -InputObject $PSItem),
+            $(Out-String -InputObject $parameters))
+    }
+    finally
+    {
+        Write-Verbose "`nRequest: `n$(Out-String -InputObject $Params)"
+        Write-Verbose "`nResonse: `n$(Out-String -InputObject $Response)"
+    }
+
+    return $response
+}
+
+### <summary>
+### Gets the resource links at resource group scope.
+### </summary>
+### <param name="resourceGroupName">Resource group name.</param>
+### <param name="filterBySourceType">Type to filter resource link sources by.</param>
+### <param name="filterByTargetType">Type to filter resource link targets by.</param>
+### <returns>List of resource link source id to target id mappings.</returns>
+function Get-ResourceLinks(
+    [string] $resourceGroupName,
+    [string] $filterBySourceType,
+    [string] $filterByTargetType)
+{
+    Write-Host -ForegroundColor Green "Fetching resource links under '$resourceGroupName'" `
+        "resource group..."
+
+    $context = Get-AzContext
+    $token = Get-AzAccessToken -ResourceTypeName Arm
+    $url = Get-UrlString -ApiVersion $([ConstantStrings]::resourceLinksApiVersion) -Tokens `
+        @(
+            [ConstantStrings]::subscriptions,
+            $context.Subscription.Id,
+            [ConstantStrings]::resourceGroups,
+            $resourceGroupName,
+            [ConstantStrings]::providers,
+            [ConstantStrings]::resourcesProvider,
+            [ConstantStrings]::resourceLinks
+        )
+
+    $params = @{
+        ContentType = [ConstantStrings]::contentType
+        Headers     = @{
+            [ConstantStrings]::authHeader = "Bearer $($token.Token)"}
+        Method      = [ConstantStrings]::httpGet
+        URI         = $url
+    }
+
+    $response = Invoke-ArmCall -Parameters $params
+
+    if ($null -eq $response)
+    {
+        return $null
+    }
+
+    $properties = $response.value.properties
+
+    $OutputLogger.LogObject(
+        $MyInvocation,
+        $properties,
+        $null,
+        [LogType]::INFO)
+
+    if (-not [string]::IsNullOrEmpty($filterBySourceType))
+    {
+        $properties = $properties | `
+            Where-Object {
+                $(Extract-ResourceTypeFromId -ArmId $_.SourceId) -like $filterBySourceType
+            }
+    }
+
+    if (-not [string]::IsNullOrEmpty($filterByTargetType))
+    {
+        $properties = $properties | `
+            Where-Object {
+                $(Extract-ResourceTypeFromId -ArmId $_.TargetId) -like $filterByTargetType
+            }
+    }
+
+    return $properties
+}
+#EndRegion
+
 ### <summary>
 ###  Gets a list of source information objects from list of VM names.
 ### </summary>
@@ -1396,6 +1692,51 @@ function Create-Secret(
 }
 
 ### <summary>
+### Create a secret in the target key vault.
+### </summary>
+### <param name="MoveCollection">Move collection.</param>
+### <param name="TargetBekVaultName">Target BEK vault name.</param>
+### <param name="TargetKekVaultName">Target BEK vault name.</param>
+function Add-ResourceMoverMSIAccessPolicy(
+    $MoveCollection,
+    [string] $TargetBekVaultName,
+    [string] $TargetKekVaultName)
+{
+    if ([string]::IsNullOrEmpty($MoveCollection.IdentityPrincipalId))
+    {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Move collection- $($MoveCollection.Name), has no MSI assigned." + `
+            "Identity type - $($MoveCollection.IdentityType).",
+            [LogType]::OUTPUT)
+        return
+    }
+
+    $OutputLogger.Log(
+        $MyInvocation,
+        "Giving move collection- $($MoveCollection.Name), access to BEK vault - " + `
+        "$($TargetBekVaultName). Adding access policy for - $($MoveCollection.IdentityPrincipalId)",
+        [LogType]::OUTPUT)
+
+    $ObjectId = $MoveCollection.IdentityPrincipalId
+
+    Set-AzKeyVaultAccessPolicy -VaultName $TargetBekVaultName -ObjectId $ObjectId `
+        -PermissionsToKeys get, list -PermissionsToSecrets get, list
+
+    if (-not [string]::IsNullOrEmpty($TargetKekVaultName))
+    {
+        $OutputLogger.Log(
+            $MyInvocation,
+            "Giving move collection- $($MoveCollection.Name), access to KEK vault - " + `
+            "$($TargetKekVaultName). Adding access policy for - $ObjectId",
+            [LogType]::OUTPUT)
+
+        Set-AzKeyVaultAccessPolicy -VaultName $TargetKekVaultName -ObjectId $ObjectId `
+            -PermissionsToKeys get, list -PermissionsToSecrets get, list
+    }
+}
+
+### <summary>
 ### Main flow of code for copying keys.
 ### </summary>
 ### <return name="CompletedList">List of VMs for which CopyKeys ran successfully</return>
@@ -1524,7 +1865,7 @@ function Start-CopyKeys
                 $OutputLogger.Log(
                     $MyInvocation,
                     "VM/Disk name: $SourceName",
-                    [LogType]::OUTPUT)
+                    [LogType]::INFO)
                 $OutputLogger.Log(
                     $MyInvocation,
                     "SourceKEKVault: $($KekKeyVaultResource.Name)",
@@ -1591,11 +1932,11 @@ function Start-CopyKeys
                 $OutputLogger.Log(
                     $MyInvocation,
                     "TargetKEKVault: $TargetKekVault",
-                    [LogType]::INFO)
+                    [LogType]::OUTPUT)
                 $OutputLogger.Log(
                     $MyInvocation,
                     "TargetKEKId: $($NewKekKey.Id)",
-                    [LogType]::INFO)
+                    [LogType]::OUTPUT)
 
                 # Decrypting Wrapped-BEK
                 $DecryptedSecret = Decrypt-Secret -EncryptedValue $BekSecretBase64 -EncryptedAlgorithm `
@@ -1648,6 +1989,52 @@ function Start-CopyKeys
         Copy-AccessPolicies -TargetKeyVaultName $TargetBekVault -TargetResourceGroupName $TargetBekRgName `
             -SourceKeyVaultName $FirstBekVault.Name -SourceAccessPolicies `
             $FirstBekVault.Properties.AccessPolicies
+    }
+
+    if ($AllowResourceMoverAccess)
+    {
+        $ResourceLinks = Get-ResourceLinks -ResourceGroupName $ResourceGroupName `
+            -FilterBySourceType $([ConstantStrings]::vmType) -filterByTargetType `
+            $([ConstantStrings]::moveResourceType)
+
+        if ($null -eq $ResourceLinks)
+        {
+            $message = "None of the VMs are in any Move Collection. Skipping Resource Mover " + `
+                "MSI access checks."
+
+            Write-Warning $message
+            $OutputLogger.Log(
+                $MyInvocation,
+                $message,
+                [LogType]::WARNING)
+        }
+        else
+        {
+            $VmMCDict = @{}
+            $MoveResourcesList = [System.Collections.Generic.HashSet[string]]::New()
+
+            $SuppressOutput = $ResourceLinks | ForEach-Object { `
+                    $VmMCDict.Add(
+                        $(Extract-ResourceNameFromId -armId $_.sourceId),
+                        $_.targetid)
+                    $MoveResourcesList.Add($_.targetid)}
+
+            $OutputLogger.LogObject(
+                $MyInvocation,
+                $VmMCDict,
+                "Move collections -",
+                [LogType]::INFO)
+
+            foreach ($Id in $MoveResourcesList)
+            {
+                $MoveCollection = Get-AzResourceMoverMoveCollection -Name `
+                    $(Extract-ParentResourceNameFromId -armId $Id) -ResourceGroupName `
+                    $(Extract-ResourceGroupFromId -armId $Id)
+
+                $SuppressOutput = Add-ResourceMoverMSIAccessPolicy -MoveCollection $MoveCollection `
+                    -TargetBekVaultName $TargetBekVault -TargetKekVaultName $TargetKekVault
+            }
+        }
     }
 
     return $CompletedList
