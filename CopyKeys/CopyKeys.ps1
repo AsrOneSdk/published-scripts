@@ -15,11 +15,15 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false,
-               HelpMessage="Location of the output file.")]
+    [Parameter(
+        Mandatory = $false,
+        HelpMessage="Switch parameter indicating if the MSI created by Azure Resource Mover" + `
+            "for moving the selected VM resources need to be given access to the target " + `
+            "BEK/KEK key vaults.")]
     [switch]$AllowResourceMoverAccess = $false,
-    [Parameter(Mandatory = $false,
-               HelpMessage="Location of the output file.")]
+    [Parameter(
+        Mandatory = $false,
+        HelpMessage="Location of the output file.")]
     [string]$FilePath = $null)
 
 ### Checking for module versions and assemblies.
@@ -319,7 +323,6 @@ class ConstantStrings
     static [string] $loadingBEK = "Loading target BEK vault"
     static [string] $loadingKEK = "Loading target KEK vault"
     static [string] $loadingRG = "Loading resource groups"
-    static [string] $managementAzureEndpoint = "https://management.azure.com"
     static [string] $moveResourceType = "moveresources"
     static [string] $newPrefix = "(new)"
     static [string] $noAdeVmInResourceGroup = "Selected resource group does `nnot contain any " + `
@@ -1242,7 +1245,9 @@ function Get-UrlString([string] $apiVersion, [string[]]$tokens)
         throw [Errors]::UrlTokensMissing()
     }
 
-    $url = [ConstantStrings]::managementAzureEndpoint + '/'
+    $context = Get-AzContext
+
+    $url = ($context.Environment.ResourceManagerUrl).TrimEnd('/') + '/'
     $url += $tokens.Trim('/') -Join '/'
     $url = $url.Trim('/')
     $url += '?' + [ConstantStrings]::apiVersion + '=' + $apiVersion
