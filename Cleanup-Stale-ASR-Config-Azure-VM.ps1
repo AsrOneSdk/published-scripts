@@ -14,7 +14,7 @@ Param
         [string]$vmName,
     [Parameter( `
         Mandatory=$false, `
-        HelpMessage = 'The login environmnet to be used. The default value is AzureCloud for public clouds. For Givernemnt clouds, specify as AzureUSGovernment. For more details about Government clouds, refer:  https://docs.microsoft.com/en-us/azure/azure-government/documentation-government-get-started-connect-with-ps')]
+        HelpMessage = 'The login environmnet to be used. The default value is AzureCloud for public clouds. For Governemnt clouds, specify as AzureUSGovernment. For more details about Government clouds, refer:  https://docs.microsoft.com/en-us/azure/azure-government/documentation-government-get-started-connect-with-ps')]
         [string]$loginEnvironment ="AzureCloud"
 )
 
