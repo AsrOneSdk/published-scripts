@@ -73,6 +73,10 @@
             "metadata": {
                 "description": "Type of the Storage account to be used for Recovery Target Disk."
             }
+        },
+        "forceTag":{
+            "defaultValue": "[utcNow()]",
+            "type": "String"
         }
     },
     "resources": [
@@ -89,7 +93,7 @@
                 }
             },
             "properties": {
-                "forceUpdateTag": "[utcNow()]",
+                "forceUpdateTag": "parameters('forceTag')",
                 "azPowerShellVersion": "3.0",
                 "timeout": "PT4H",
                 "arguments": "[concat('-VaultSubscriptionId', ' ', parameters('VaultSubscriptionId'), ' ', '-VaultResourceGroupName', ' ', parameters('vaultResourceGroupName'), ' ', '-VaultName', ' ', parameters('vaultName'), ' ', '-PrimaryRegion', ' ', replace(string(parameters('primaryRegion')), ' ', ''), ' ', '-RecoveryRegion', ' ', replace(string(parameters('recoveryRegion')), ' ', ''), ' ', '-sourceVmARMIdsCSV', ' \\\"', parameters('sourceVmARMIds'), '\\\" ', '-RecoveryStagingStorageAccount', ' ', parameters('recoveryStagingStorageAccount'), ' ', '-RecoveryReplicaDiskAccountType', ' ', parameters('recoveryReplicaDiskAccountType'), ' ', '-RecoveryTargetDiskAccountType', ' ', parameters('recoveryTargetDiskAccountType'))]",
