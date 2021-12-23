@@ -1918,7 +1918,7 @@ function Start-CopyKeys
                 {
                     # Creating the new KEK
                     $NewKekKey = Add-AzKeyVaultKey -VaultName $TargetKekVault -Name $KekKey.Name `
-                        -Destination Software
+                        -Destination Software -Size $Kekkey.KeySize
 
                     $OutputLogger.Log(
                         $MyInvocation,
