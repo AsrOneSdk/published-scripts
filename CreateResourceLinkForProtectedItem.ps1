@@ -2,12 +2,12 @@ Param
 (
     [Parameter( `
         Mandatory=$true, `
-        HelpMessage = 'Enter subscription Id to be used.')]
-        [string]$subscriptionId,
+        HelpMessage = 'Enter VM Subscription Id to be used.')]
+        [string]$VMSubscriptionId,
     [Parameter( `
         Mandatory=$true, `
         HelpMessage = 'Specify the name of the Resource group in which your VM is located.')]
-        [string]$rgName,
+        [string]$VMRgName,
     [Parameter( `
         Mandatory=$true, `
         HelpMessage = 'Specify the name of the VM.')]
@@ -16,6 +16,10 @@ Param
         Mandatory=$true, `
         HelpMessage = 'Specify the name of the Resource group in which your Vault is located.')]
         [string]$vaultRGName,
+    [Parameter( `
+        Mandatory=$true, `
+        HelpMessage = 'Enter Vault Subscription Id to be used.')]
+        [string]$VaultSubscriptionId,
     [Parameter( `
         Mandatory=$true, `
         HelpMessage = 'Specify the name of the Vault.')]
@@ -31,12 +35,12 @@ Param
 Login-AzAccount -Environment $loginEnvironment 
 
 #Select Azure Subscription
-Select-AzSubscription -SubscriptionId $subscriptionId
+Select-AzSubscription -SubscriptionId $VaultSubscriptionId
 
 $context = Get-AzContext
 $azureUrl = $context.Environment.ResourceManagerUrl
-$vmId = '/subscriptions/' + $subscriptionId + '/resourceGroups/' + $rgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName + '/'
-$vmARMId ='/subscriptions/' + $subscriptionId + '/resourceGroups/' + $rgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName
+$vmId = '/subscriptions/' + $VMSubscriptionId + '/resourceGroups/' + $VMRgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName + '/'
+$vmARMId ='/subscriptions/' + $VMSubscriptionId + '/resourceGroups/' + $VMRgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName
 
 # Get the protected item ARM Id.
 $vault = Get-AzRecoveryServicesVault -ResourceGroupName $vaultRGName -Name $vaultName
@@ -46,9 +50,21 @@ $protectedItems.Name
 $protectedItems.Id
 
 $resourceLinkName = "ASR-Protect-" + $protectedItems.Name
-$resourceLinkTargetId = $protectedItems.Id + "/"
-$resourceLinkSourceId = '/subscriptions/' + $subscriptionId + '/resourceGroups/' + $rgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName + '/'
+$resourceLinkSourceId = '/subscriptions/' + $VMSubscriptionId + '/resourceGroups/' + $VMRgName + '/providers/Microsoft.Compute/virtualMachines/' + $vmName + '/'
 $resourceLinkId = $resourceLinkSourceId + "providers/Microsoft.Resources/links/" + $resourceLinkName
+$resourceLinkTargetId = $protectedItems.Id + "/"
+$linkNotes = ""
+
+# Target Id
+if ($VMSubscriptionId -ne $VaultSubscriptionId)
+{
+    Write-Host "This is a cross subscription scenario"
+    $resourceLinkNotes = New-Object System.Collections.Generic.Dictionary"[String,String]"
+    $resourceLinkNotes.Add("protectedItemArmId",$resourceLinkTargetId)
+    $resourceLinkTargetId = $resourceLinkSourceId  + "ProtectedItemArmId/" + $protectedItems.Name + "-nonexistent-use-from-linknotes/"
+    $linkNotes =  ConvertTo-Json -InputObject $resourceLinkNotes 
+}
+
 $resourceLinkTargetId
 $resourceLinkSourceId
 $resourceLinkName  
@@ -58,7 +74,7 @@ $token = (Get-AzAccessToken).Token
 $Header = @{"authorization" = "Bearer $token"}
 $Header['Content-Type'] = "application\json"
 
-$Url =  $azureUrl + "subscriptions/" + $subscriptionId  + "/resourcegroups/" + $rgName + "/providers/microsoft.compute/virtualmachines/" + $vmName + "/providers/Microsoft.Resources/links/" +  $resourceLinkName + "?api-version=2016-09-01"
+$Url =  $azureUrl + "subscriptions/" + $VMSubscriptionId + "/resourcegroups/" + $VMRgName + "/providers/microsoft.compute/virtualmachines/" + $vmName + "/providers/Microsoft.Resources/links/" +  $resourceLinkName + "?api-version=2016-09-01"
 $url
 
 ### Creating the request body 
@@ -66,7 +82,7 @@ $body = @{
         "properties"= @{
         "sourceId"= $resourceLinkSourceId 
         "targetId"=  $resourceLinkTargetId
-        "notes"= ""
+        "notes"= $linkNotes
       }
       "id"= $resourceLinkId
       "type"= "Microsoft.Resources/links"
