@@ -17,6 +17,7 @@ $AadAuthority = "https://login.windows.net/"
 $AadAudience = "https://management.core.windows.net/"
 $AzureEnvironment = "AzureCloud"
 $Timeout = "160"
+$AuthenticationType = "SystemAssignedIdentity"
 function Throw-TerminatingErrorMessage
 {
         Param
