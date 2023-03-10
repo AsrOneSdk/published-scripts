@@ -11,7 +11,7 @@ param(
 $SiteRecoveryRunbookName = "Modify-AutoUpdateForVaultForPatner"
 $TaskId = [guid]::NewGuid().ToString()
 $SubscriptionId = "00000000-0000-0000-0000-000000000000"
-$AsrApiVersion = "2018-07-10"
+$AsrApiVersion = "2021-12-01"
 $ArmEndPoint = "https://management.azure.com"
 $AadAuthority = "https://login.windows.net/"
 $AadAudience = "https://management.core.windows.net/"
@@ -241,7 +241,6 @@ $Inputs = ("Tracing inputs VaultResourceId: {0}, Timeout: {1}, AutoUpdateAction:
 Write-Tracing -Message $Inputs -Level Informational -DisplayMessageToUser
 $CloudConfig = ("Tracing cloud configuration ArmEndPoint: {0}, AadAuthority: {1}, AadAudience: {2}." -f $ArmEndPoint, $AadAuthority, $AadAudience)
 Write-Tracing -Message $CloudConfig -Level Informational -DisplayMessageToUser
-Write-Tracing -Message $AutomationConfig -Level Informational -DisplayMessageToUser
 ValidateInput
 $SubscriptionId = Initialize-SubscriptionId
 Get-ProtectionContainerToBeModified ([ref]$ContainerMappingList)
