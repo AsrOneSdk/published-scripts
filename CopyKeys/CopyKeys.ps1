@@ -596,7 +596,7 @@ function Get-VirtualMachines
 
         foreach ($Item in $VmList)
         {
-            if (($null -ne $Item.Extensions) -and
+            if (($null -ne $Item.Extensions -and $Item.Extensions.Count -gt 0) -and
                 ($Item.Extensions.Id | ForEach-Object { `
                     $_.split('/')[-1].tolower().contains( `
                         [ConstantStrings]::adeExtensionPrefix)}) -contains $true)
