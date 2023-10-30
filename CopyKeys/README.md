@@ -15,3 +15,4 @@ This script copies the disk encryption keys and key encryption keys for Azure Di
 |02/23 | - Fixed GUI issues in case of varying resolution.</br> - Fixed login bug in case of expired context. |
 |02/28 | - Removing hardcoded vault endpoint and replacing it with one provided by KeyVault RP. |
 |04/09 | - Providing MoveCollection MSI with appropriate target key vault access in case the script is used for Azure Resource Mover. |
+|30/10/2023 | - Handling case when extensions list is empty but not null
