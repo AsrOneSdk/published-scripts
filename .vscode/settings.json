@@ -1,0 +1,5 @@
+{
+  "powershell.codeFormatting.preset": "Allman",
+  "powershell.codeFormatting.whitespaceBeforeOpenBrace": true,
+  "powershell.codeFormatting.whitespaceBeforeOpenParen": true
+}
