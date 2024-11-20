@@ -312,7 +312,6 @@ class Source
 
 class ConstantStrings
 {
-    static [string] $adeExtensionPrefix = "azurediskencryption"
     static [string] $apiVersion = "api-version"
     static [string] $asrSuffix = "-asr"
     static [string] $authHeader = "authorization"
@@ -592,19 +591,29 @@ function Get-VirtualMachines
         $LocationDropDown.Enabled = $true
         $LocationDropDown.Text = [string]::Empty
 
-        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | Sort-Object Name
+        # Get VMs in given resource group
+        $VmList = [array](
+            (Get-AzVm -ResourceGroupName $ResourceGroupName ) | Sort-Object -Property 'Name'
+        )
 
-        foreach ($Item in $VmList)
-        {
-            if (($null -ne $Item.Extensions -and $Item.Extensions.Count -gt 0) -and
-                ($Item.Extensions.Id | ForEach-Object { `
-                    $_.split('/')[-1].tolower().contains( `
-                        [ConstantStrings]::adeExtensionPrefix)}) -contains $true)
-            {
-                $SuppressOutput = $VmListBox.Items.Add($Item.Name)
-            }
+        # Get more details for installed extensions
+        $VmList.ForEach{
+            $null = Add-Member -InputObject $_ -Force -NotePropertyName 'Extensions' -NotePropertyValue (
+                [array](
+                    Get-AzVMExtension -ResourceGroupName $_.'ResourceGroupName' -VMName $_.'Name'
+                )
+            )
         }
 
+        # Add VMs with the Azure Disk Encryption extension to the list
+        $VmList.Where{
+            $_.'Extensions'.Where{$_.'ExtensionType' -eq 'AzureDiskEncryption'}.'Count' -gt 0
+        }.ForEach{
+            Write-Verbose -Message ('Adding VM "{0}" to the list' -f $_.'Name')
+            $null = $VmListBox.'Items'.Add($_.'Name')
+        }
+
+        # Add VMs to GUI
         if($VmList -and ($VmListBox.Items.Count -gt 0))
         {
             $Longest = ($VmList.Name | Sort-Object Length -Descending)[0]
