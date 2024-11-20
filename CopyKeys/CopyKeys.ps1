@@ -17,13 +17,13 @@
 param(
     [Parameter(
         Mandatory = $false,
-        HelpMessage="Switch parameter indicating if the MSI created by Azure Resource Mover" + `
-            "for moving the selected VM resources need to be given access to the target " + `
-            "BEK/KEK key vaults.")]
+        HelpMessage = 'Switch parameter indicating if the MSI created by Azure Resource Mover' + `
+            'for moving the selected VM resources need to be given access to the target ' + `
+            'BEK/KEK key vaults.')]
     [switch]$AllowResourceMoverAccess = $false,
     [Parameter(
         Mandatory = $false,
-        HelpMessage="Location of the output file.")]
+        HelpMessage = 'Location of the output file.')]
     [string]$FilePath = $null)
 
 ### Checking for module versions and assemblies.
@@ -119,7 +119,7 @@ class Logger
     {
         $path = $this.fileName + '.log'
 
-        if($this.filePath)
+        if ($this.filePath)
         {
             if (-not (Test-Path $this.filePath))
             {
@@ -127,9 +127,9 @@ class Logger
                 return $path
             }
 
-            if ($this.filePath[-1] -ne "\")
+            if ($this.filePath[-1] -ne '\')
             {
-                $this.filePath = $this.filePath + "\"
+                $this.filePath = $this.filePath + '\'
             }
 
             $path = $this.filePath + $path
@@ -152,10 +152,10 @@ class Logger
         [string]$message,
         [LogType] $type)
     {
-        $dateTime = Get-Date -uFormat "%d/%m/%Y %r"
+        $dateTime = Get-Date -uFormat '%d/%m/%Y %r'
         $line = $type.ToString() + "`t`t: $dateTime "
         $line +=
-            "$($invocationInfo.scriptName.split('\')[-1]):$($invocationInfo.scriptLineNumber) " + `
+        "$($invocationInfo.scriptName.split('\')[-1]):$($invocationInfo.scriptLineNumber) " + `
             "[$($invocationInfo.invocationName)]: "
         $line += $message
 
@@ -167,7 +167,7 @@ class Logger
     ### </summary>
     [Void] StartDebugLog()
     {
-        $script:DebugPreference = "Continue"
+        $script:DebugPreference = 'Continue'
         $this.isDebugSegmentOpen = $true
     }
 
@@ -176,7 +176,7 @@ class Logger
     ### </summary>
     [Void] StopDebugLog()
     {
-        $script:DebugPreference = "SilentlyContinue"
+        $script:DebugPreference = 'SilentlyContinue'
         $this.isDebugSegmentOpen = $false
     }
 
@@ -264,7 +264,7 @@ class Logger
         }
 
         Out-File -FilePath $($this.GetFullPath()) -InputObject `
-            $(ConvertTo-Json -InputObject $object) -Append -NoClobber
+        $(ConvertTo-Json -InputObject $object) -Append -NoClobber
     }
 }
 #endRegion
@@ -312,31 +312,30 @@ class Source
 
 class ConstantStrings
 {
-    static [string] $adeExtensionPrefix = "azurediskencryption"
-    static [string] $apiVersion = "api-version"
-    static [string] $asrSuffix = "-asr"
-    static [string] $authHeader = "authorization"
-    static [string] $contentType = "application/json"
-    static [string] $httpGet = "GET"
-    static [string] $httpPost = "POST"
+    static [string] $apiVersion = 'api-version'
+    static [string] $asrSuffix = '-asr'
+    static [string] $authHeader = 'authorization'
+    static [string] $contentType = 'application/json'
+    static [string] $httpGet = 'GET'
+    static [string] $httpPost = 'POST'
     static [int] $keyVaultNameMaxLength = 24
-    static [string] $loadingBEK = "Loading target BEK vault"
-    static [string] $loadingKEK = "Loading target KEK vault"
-    static [string] $loadingRG = "Loading resource groups"
-    static [string] $moveResourceType = "moveresources"
-    static [string] $newPrefix = "(new)"
+    static [string] $loadingBEK = 'Loading target BEK vault'
+    static [string] $loadingKEK = 'Loading target KEK vault'
+    static [string] $loadingRG = 'Loading resource groups'
+    static [string] $moveResourceType = 'moveresources'
+    static [string] $newPrefix = '(new)'
     static [string] $noAdeVmInResourceGroup = "Selected resource group does `nnot contain any " + `
-        "encrypted VMs."
-    static [string] $notApplicable = "Not Applicable"
-    static [string] $providers = "providers"
-    static [string] $resourceGroups = "resourceGroups"
-    static [string] $resourceLinks = "links"
-    static [string] $resourceLinksApiVersion = "2016-09-01"
-    static [string] $resourcesProvider = "Microsoft.Resources"
-    static [string] $scopes = "scopes"
-    static [string] $subscriptions = "subscriptions"
-    static [string] $tokenType = "Bearer"
-    static [string] $vmType = "virtualmachines"
+        'encrypted VMs.'
+    static [string] $notApplicable = 'Not Applicable'
+    static [string] $providers = 'providers'
+    static [string] $resourceGroups = 'resourceGroups'
+    static [string] $resourceLinks = 'links'
+    static [string] $resourceLinksApiVersion = '2016-09-01'
+    static [string] $resourcesProvider = 'Microsoft.Resources'
+    static [string] $scopes = 'scopes'
+    static [string] $subscriptions = 'subscriptions'
+    static [string] $tokenType = 'Bearer'
+    static [string] $vmType = 'virtualmachines'
 }
 #endregion
 
@@ -367,7 +366,7 @@ class Errors
     static [string] DiskEncryptionInfoMissing([string] $vmName, [string] $diskName)
     {
         return "Virtual machine $vmName encrypted but disk encryption " + `
-        "settings missing for disk - $diskName."
+            "settings missing for disk - $diskName."
     }
 
     ### <summary>
@@ -465,7 +464,7 @@ class Errors
     ### <return>Error string.</return>
     static [string] ApiVersionMissing()
     {
-        return "API version related information is missing."
+        return 'API version related information is missing.'
     }
 
     ### <summary>
@@ -474,7 +473,7 @@ class Errors
     ### <return>Error string.</return>
     static [string] UrlTokensMissing()
     {
-        return "Tokens for URL construction are missing."
+        return 'Tokens for URL construction are missing.'
     }
 
     ### <summary>
@@ -483,7 +482,7 @@ class Errors
     ### <return>Error string.</return>
     static [string] InvalidArmIdInput()
     {
-        return "The resource ARM id input is invalid."
+        return 'The resource ARM id input is invalid.'
     }
 
     ### <summary>
@@ -497,7 +496,7 @@ class Errors
         [int] $tokenCount)
     {
         return "Labelled tokens cannot be created for ARM id - '$armId', as the token count " +
-            "($tokenCount) is odd."
+        "($tokenCount) is odd."
     }
 }
 #EndRegion
@@ -529,10 +528,10 @@ function Get-ResourceGroups
         # just to stay in parallel with the Portal.
         $Locations = ($ResourceProvider[0].Locations) | ForEach-Object {
             $_.Split(' ').tolower() -join ''} | Sort-Object
-        $ResourceGroupLabel = $FormElements["ResourceGroupLabel"]
-        $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
-        $VmListBox = $FormElements["VmListBox"]
-        $LocationDropDown = $FormElements["LocationDropDown"]
+        $ResourceGroupLabel = $FormElements['ResourceGroupLabel']
+        $ResourceGroupDropDown = $FormElements['ResourceGroupDropDown']
+        $VmListBox = $FormElements['VmListBox']
+        $LocationDropDown = $FormElements['LocationDropDown']
         $ResourceGroupLabel.Enabled = $true
         $ResourceGroupDropDown.Enabled = $true
         $ResourceGroupDropDown.Items.Clear()
@@ -547,11 +546,11 @@ function Get-ResourceGroups
             $SuppressOutput = $ResourceGroupDropDown.Items.Add($Item)
         }
 
-        if($ResourceGroupArray)
+        if ($ResourceGroupArray)
         {
             $Longest = ($ResourceGroupArray | Sort-Object Length -Descending)[0]
             $ResourceGroupDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                $ResourceGroupDropDown.Font).Width, $ResourceGroupDropDown.Width | Measure-Object -Maximum).Maximum
+                        $ResourceGroupDropDown.Font).Width, $ResourceGroupDropDown.Width | Measure-Object -Maximum).Maximum
         }
 
         foreach ($Item in $Locations)
@@ -559,11 +558,11 @@ function Get-ResourceGroups
             $SuppressOutput = $LocationDropDown.Items.Add($Item)
         }
 
-        if($Locations)
+        if ($Locations)
         {
             $Longest = ($Locations | Sort-Object Length -Descending)[0]
             $LocationDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                $LocationDropDown.Font).Width, $LocationDropDown.Width | Measure-Object -Maximum).Maximum
+                        $LocationDropDown.Font).Width, $LocationDropDown.Width | Measure-Object -Maximum).Maximum
         }
 
         for ($Index = 4; $Index -lt $FormElementsList.Count; $Index++)
@@ -584,32 +583,42 @@ function Get-VirtualMachines
     if ($ResourceGroupName)
     {
         $LoadingLabel.Text = [string]::Empty
-        $VmListBox = $FormElements["VmListBox"]
+        $VmListBox = $FormElements['VmListBox']
         $VmListBox.Items.Clear()
-        $FormElements["VmLabel"].Enabled = $true
-        $FormElements["LocationLabel"].Enabled = $true
+        $FormElements['VmLabel'].Enabled = $true
+        $FormElements['LocationLabel'].Enabled = $true
         $VmListBox.Enabled = $true
         $LocationDropDown.Enabled = $true
         $LocationDropDown.Text = [string]::Empty
 
-        $VmList = (Get-AzVm -ResourceGroupName $ResourceGroupName) | Sort-Object Name
+        # Get VMs in given resource group
+        $VmList = [array](
+            (Get-AzVm -ResourceGroupName $ResourceGroupName ) | Sort-Object -Property 'Name'
+        )
 
-        foreach ($Item in $VmList)
-        {
-            if (($null -ne $Item.Extensions -and $Item.Extensions.Count -gt 0) -and
-                ($Item.Extensions.Id | ForEach-Object { `
-                    $_.split('/')[-1].tolower().contains( `
-                        [ConstantStrings]::adeExtensionPrefix)}) -contains $true)
-            {
-                $SuppressOutput = $VmListBox.Items.Add($Item.Name)
-            }
+        # Get more details for installed extensions
+        $VmList.ForEach{
+            $null = Add-Member -InputObject $_ -Force -NotePropertyName 'Extensions' -NotePropertyValue (
+                [array](
+                    Get-AzVMExtension -ResourceGroupName $_.'ResourceGroupName' -VMName $_.'Name'
+                )
+            )
         }
 
-        if($VmList -and ($VmListBox.Items.Count -gt 0))
+        # Add VMs with the Azure Disk Encryption extension to the list
+        $VmList.Where{
+            $_.'Extensions'.Where{$_.'ExtensionType' -eq 'AzureDiskEncryption'}.'Count' -gt 0
+        }.ForEach{
+            Write-Verbose -Message ('Adding VM "{0}" to the list' -f $_.'Name')
+            $null = $VmListBox.'Items'.Add($_.'Name')
+        }
+
+        # Add VMs to GUI
+        if ($VmList -and ($VmListBox.Items.Count -gt 0))
         {
             $Longest = ($VmList.Name | Sort-Object Length -Descending)[0]
             $Size = [System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                $VmListBox.Font).Width
+                    $VmListBox.Font).Width
 
             if ($Size -gt $VmListBox.Width)
             {
@@ -634,9 +643,9 @@ function Get-VirtualMachines
 ### </summary>
 function Disable-RestOfOptions
 {
-    $FormElements["LocationDropDown"].Text = [string]::Empty
-    $FormElements["BekDropDown"].Text = [string]::Empty
-    $FormElements["KekDropDown"].Text = [string]::Empty
+    $FormElements['LocationDropDown'].Text = [string]::Empty
+    $FormElements['BekDropDown'].Text = [string]::Empty
+    $FormElements['KekDropDown'].Text = [string]::Empty
 
     for ($Index = 8; $Index -lt $FormElementsList.Count; $Index++)
     {
@@ -659,10 +668,10 @@ function Get-KeyVaults
         return
     }
 
-    $BekDropDown = $FormElements["BekDropDown"]
-    $KekDropDown = $FormElements["KekDropDown"]
-    $ResourceGroupDropDown = $FormElements["ResourceGroupDropDown"]
-    $VmSelected = $FormElements["VmListBox"].CheckedItems
+    $BekDropDown = $FormElements['BekDropDown']
+    $KekDropDown = $FormElements['KekDropDown']
+    $ResourceGroupDropDown = $FormElements['ResourceGroupDropDown']
+    $VmSelected = $FormElements['VmListBox'].CheckedItems
     $FailCount = 0
 
     if ($VmSelected)
@@ -697,7 +706,7 @@ function Get-KeyVaults
                     }
                 }
 
-                if($IsNotEncrypted)
+                if ($IsNotEncrypted)
                 {
                     throw [Errors]::EncryptionInfoMissing($vm.Name)
                 }
@@ -776,7 +785,7 @@ function Get-KeyVaults
             if ($BekDropDown.Items.Count -le 1)
             {
                 $KeyVaultList = (Get-AzKeyVault | Where-Object { `
-                    $_.Location -like $LocationName}).VaultName | Sort-Object
+                            $_.Location -like $LocationName}).VaultName | Sort-Object
 
                 foreach ($Item in $KeyVaultList)
                 {
@@ -784,20 +793,20 @@ function Get-KeyVaults
                     $SuppressOutput = $KekDropDown.Items.Add($Item)
                 }
 
-                if($KeyVaultList)
+                if ($KeyVaultList)
                 {
-                    if($Bek)
+                    if ($Bek)
                     {
                         $Longest = ($KeyVaultList + $BekKeyVaultName | Sort-Object Length -Descending)[0]
                         $BekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                            $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
+                                    $BekDropDown.Font).Width, $BekDropDown.Width | Measure-Object -Maximum).Maximum
                     }
 
-                    if($Kek)
+                    if ($Kek)
                     {
-                        $Longest = ($KeyVaultList + $KekKeyVaultName  | Sort-Object Length -Descending)[0]
+                        $Longest = ($KeyVaultList + $KekKeyVaultName | Sort-Object Length -Descending)[0]
                         $KekDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-                            $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
+                                    $KekDropDown.Font).Width, $KekDropDown.Width | Measure-Object -Maximum).Maximum
                     }
                 }
             }
@@ -825,13 +834,13 @@ function Get-KeyVaults
 ### </summary>
 function Get-AllSelections
 {
-    $UserInputs["ResourceGroupName"] = $FormElements["ResourceGroupDropDown"].SelectedItem.ToString()
-    $UserInputs["VmNameArray"] = $FormElements["VmListBox"].CheckedItems
-    $UserInputs["TargetLocation"] = $FormElements["LocationDropDown"].SelectedItem.ToString()
-    $BekKeyVault = $FormElements["BekDropDown"].Text.Split(')')
-    $UserInputs["TargetBekVault"] = $BekKeyVault[$BekKeyVault.Count - 1]
-    $KekKeyVault = $FormElements["KekDropDown"].Text.Split(')')
-    $UserInputs["TargetKekVault"] = $KekKeyVault[$KekKeyVault.Count - 1]
+    $UserInputs['ResourceGroupName'] = $FormElements['ResourceGroupDropDown'].SelectedItem.ToString()
+    $UserInputs['VmNameArray'] = $FormElements['VmListBox'].CheckedItems
+    $UserInputs['TargetLocation'] = $FormElements['LocationDropDown'].SelectedItem.ToString()
+    $BekKeyVault = $FormElements['BekDropDown'].Text.Split(')')
+    $UserInputs['TargetBekVault'] = $BekKeyVault[$BekKeyVault.Count - 1]
+    $KekKeyVault = $FormElements['KekDropDown'].Text.Split(')')
+    $UserInputs['TargetKekVault'] = $KekKeyVault[$KekKeyVault.Count - 1]
     $UserInputForm.Close()
 }
 
@@ -845,15 +854,15 @@ function Add-CommonFormatting(
     [System.Collections.Hashtable] $Formattings)
 {
     $UiObject.Enabled = $false
-    $UiObject.Font = "Microsoft Sans Serif, 10"
-    $UiObject.ForeColor = "#5c7290"
-    $UiObject.width = $Formattings["width"] * $WidthRatio
-    $UiObject.height = $Formattings["height"] * $HeightRatio
+    $UiObject.Font = 'Microsoft Sans Serif, 10'
+    $UiObject.ForeColor = '#5c7290'
+    $UiObject.width = $Formattings['width'] * $WidthRatio
+    $UiObject.height = $Formattings['height'] * $HeightRatio
 
     $UiObject.location =
-        New-Object System.Drawing.Point(
-            $($Formattings["location"][0] * $WidthRatio),
-            $($Formattings["location"][1] * $HeightRatio))
+    New-Object System.Drawing.Point(
+        $($Formattings['location'][0] * $WidthRatio),
+        $($Formattings['location'][1] * $HeightRatio))
 }
 
 ### <summary>
@@ -862,8 +871,8 @@ function Add-CommonFormatting(
 function Generate-UserInterface
 {
     $Size = [System.Windows.Forms.SystemInformation]::PrimaryMonitorSize
-    $WidthRatio = [Convert]::ToInt32($Size.Width/1620)
-    $HeightRatio = [Convert]::ToInt32($Size.Height/1080)
+    $WidthRatio = [Convert]::ToInt32($Size.Width / 1620)
+    $HeightRatio = [Convert]::ToInt32($Size.Height / 1080)
 
     $UserInputForm = New-Object System.Windows.Forms.Form
     $SubscriptionLabel = New-Object System.Windows.Forms.Label
@@ -882,32 +891,33 @@ function Generate-UserInterface
     $SelectButton = New-Object System.Windows.Forms.Button
     $InfoToolTip = New-Object System.Windows.Forms.ToolTip
 
-    $FormElementsList = @("SubscriptionLabel", "SubscriptionDropDown", "ResourceGroupLabel", `
-        "ResourceGroupDropDown", "VmLabel", "VmListBox", "LocationLabel", "LocationDropDown", `
-        "BekLabel", "BekDropDown", "KekLabel", "KekDropDown", "SelectButton")
-    $FormElements = @{"SubscriptionLabel" = $SubscriptionLabel;` "SubscriptionDropDown" = `
-        $SubscriptionDropDown; "ResourceGroupLabel" = $ResourceGroupLabel; "ResourceGroupDropDown" = `
-        $ResourceGroupDropDown;` "VmLabel" = $VmLabel; "VmListBox" = $VmListBox; "LocationLabel" = `
-        $LocationLabel; "LocationDropDown" = $LocationDropDown; "BekLabel" = $BekLabel; "BekDropDown" = `
-        $BekDropDown; "KekLabel" = $KekLabel; "KekDropDown" = $KekDropDown; "SelectButton" = $SelectButton}
+    $FormElementsList = @('SubscriptionLabel', 'SubscriptionDropDown', 'ResourceGroupLabel', `
+            'ResourceGroupDropDown', 'VmLabel', 'VmListBox', 'LocationLabel', 'LocationDropDown', `
+            'BekLabel', 'BekDropDown', 'KekLabel', 'KekDropDown', 'SelectButton')
+    $FormElements = @{'SubscriptionLabel' = $SubscriptionLabel;` 'SubscriptionDropDown' = `
+            $SubscriptionDropDown; 'ResourceGroupLabel' = $ResourceGroupLabel; 'ResourceGroupDropDown' = `
+            $ResourceGroupDropDown;` 'VmLabel' = $VmLabel; 'VmListBox' = $VmListBox; 'LocationLabel' = `
+            $LocationLabel; 'LocationDropDown' = $LocationDropDown; 'BekLabel' = $BekLabel; 'BekDropDown' = `
+            $BekDropDown; 'KekLabel' = $KekLabel; 'KekDropDown' = $KekDropDown; 'SelectButton' = $SelectButton
+    }
 
     # Applying formatting to various UI objects
 
     $UserInputForm.ClientSize = "$(445*$WidthRatio), $(620*$HeightRatio)"
-    $UserInputForm.text = "User Inputs"
-    $UserInputForm.BackColor = "#ffffff"
+    $UserInputForm.text = 'User Inputs'
+    $UserInputForm.BackColor = '#ffffff'
     $UserInputForm.TopMost = $false
     $UserInputForm.AutoScaleMode = 'Font'
 
-    $SubscriptionLabelFormatting = @{"location"=@(10, 90); "width"=88; "height"=30}
+    $SubscriptionLabelFormatting = @{'location' = @(10, 90); 'width' = 88; 'height' = 30}
     Add-CommonFormatting -UiObject $SubscriptionLabel -Formattings $SubscriptionLabelFormatting
-    $SubscriptionLabel.text = "Subscription"
+    $SubscriptionLabel.text = 'Subscription'
     $SubscriptionLabel.AutoSize = $true
     $SubscriptionLabel.Enabled = $true
-    $SubscriptionLabel.Tag = "Specify the Azure subscription ID."
+    $SubscriptionLabel.Tag = 'Specify the Azure subscription ID.'
     $SubscriptionLabel.Add_MouseHover({Show-Help})
 
-    $SubscriptionDropDownFormatting = @{"location"=@(10, 121); "width"=424; "height"=66}
+    $SubscriptionDropDownFormatting = @{'location' = @(10, 121); 'width' = 424; 'height' = 66}
     Add-CommonFormatting -UiObject $SubscriptionDropDown -Formattings `
         $SubscriptionDropDownFormatting
     $SubscriptionDropDown.Enabled = $true
@@ -916,88 +926,88 @@ function Generate-UserInterface
     $SubscriptionDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $SubscriptionDropDown.Add_SelectedIndexChanged({Get-ResourceGroups})
 
-    $ResourceGroupDropDownFormatting = @{"location"=@(10, 189); "width"=424; "height"=60}
+    $ResourceGroupDropDownFormatting = @{'location' = @(10, 189); 'width' = 424; 'height' = 60}
     Add-CommonFormatting -UiObject $ResourceGroupDropDown -Formattings `
         $ResourceGroupDropDownFormatting
     $ResourceGroupDropDown.DropDownHeight = 150 * $HeightRatio
     $ResourceGroupDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $ResourceGroupDropDown.Add_SelectedIndexChanged({Get-VirtualMachines})
 
-    $ResourceGroupLabelFormatting = @{"location"=@(10, 163); "width"=25; "height"=10}
+    $ResourceGroupLabelFormatting = @{'location' = @(10, 163); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $ResourceGroupLabel -Formattings $ResourceGroupLabelFormatting
-    $ResourceGroupLabel.text = "Resource Group"
+    $ResourceGroupLabel.text = 'Resource Group'
     $ResourceGroupLabel.AutoSize = $true
-    $ResourceGroupLabel.Tag = "Specify the source resource group containing the virtual machines."
+    $ResourceGroupLabel.Tag = 'Specify the source resource group containing the virtual machines.'
     $ResourceGroupLabel.Add_MouseHover({Show-Help})
 
-    $VmListBoxFormatting = @{"location"=@(10, 255); "width"=424; "height"=95}
+    $VmListBoxFormatting = @{'location' = @(10, 255); 'width' = 424; 'height' = 95}
     Add-CommonFormatting -UiObject $VmListBox -Formattings $VmListBoxFormatting
     $VmListBox.CheckOnClick = $true
     $VmListBox.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $VmListBox.Add_SelectedIndexChanged({Disable-RestOfOptions})
 
-    $VmLabelFormatting = @{"location"=@(10, 233); "width"=25; "height"=10}
+    $VmLabelFormatting = @{'location' = @(10, 233); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $VmLabel -Formattings $VmLabelFormatting
-    $VmLabel.text = "Choose virtual machine(s)"
+    $VmLabel.text = 'Choose virtual machine(s)'
     $VmLabel.AutoSize = $true
-    $VmLabel.Tag = "Select the virtual machines whose Disk Encryption Keys need to be copied to DR location."
+    $VmLabel.Tag = 'Select the virtual machines whose Disk Encryption Keys need to be copied to DR location.'
     $VmLabel.Add_MouseHover({Show-Help})
 
-    $BekDropDownFormatting = @{"location"=@(10, 445); "width"=424; "height"=30}
+    $BekDropDownFormatting = @{'location' = @(10, 445); 'width' = 424; 'height' = 30}
     Add-CommonFormatting -UiObject $BekDropDown -Formattings $BekDropDownFormatting
     $BekDropDown.DropDownHeight = 150 * $HeightRatio
     $BekDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
 
-    $BekLabelFormatting = @{"location"=@(10, 420); "width"=25; "height"=10}
+    $BekLabelFormatting = @{'location' = @(10, 420); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $BekLabel -Formattings $BekLabelFormatting
-    $BekLabel.text = "Target Disk Encryption Key vault"
+    $BekLabel.text = 'Target Disk Encryption Key vault'
     $BekLabel.AutoSize = $true
-    $BekLabel.Tag = "Specify the target disk encryption key vault in DR region where the keys will be copied to."
+    $BekLabel.Tag = 'Specify the target disk encryption key vault in DR region where the keys will be copied to.'
     $BekLabel.Add_MouseHover({Show-Help})
 
-    $KekDropDownFormatting = @{"location"=@(10, 506); "width"=424; "height"=30}
+    $KekDropDownFormatting = @{'location' = @(10, 506); 'width' = 424; 'height' = 30}
     Add-CommonFormatting -UiObject $KekDropDown -Formattings $KekDropDownFormatting
     $KekDropDown.DropDownHeight = 150 * $HeightRatio
     $KekDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
 
-    $KekLabelFormatting = @{"location"=@(10, 480); "width"=25; "height"=10}
+    $KekLabelFormatting = @{'location' = @(10, 480); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $KekLabel -Formattings $KekLabelFormatting
-    $KekLabel.text = "Target Key Encryption Key vault"
+    $KekLabel.text = 'Target Key Encryption Key vault'
     $KekLabel.AutoSize = $true
-    $KekLabel.Tag = "Specify the target key encryption key vault in DR region where the keys will be copied to."
+    $KekLabel.Tag = 'Specify the target key encryption key vault in DR region where the keys will be copied to.'
     $KekLabel.Add_MouseHover({Show-Help})
 
-    $LocationDropDownFormatting = @{"location"=@(10, 386); "width"=424; "height"=20}
+    $LocationDropDownFormatting = @{'location' = @(10, 386); 'width' = 424; 'height' = 20}
     Add-CommonFormatting -UiObject $LocationDropDown -Formattings $LocationDropDownFormatting
     $LocationDropDown.DropDownHeight = 150 * $HeightRatio
     $LocationDropDown.Font = "Microsoft Sans Serif, $(10 * $HeightRatio)"
     $LocationDropDown.Add_SelectedIndexChanged({Get-KeyVaults})
 
-    $LocationLabelFormatting = @{"location"=@(10, 360); "width"=25; "height"=10}
+    $LocationLabelFormatting = @{'location' = @(10, 360); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $LocationLabel -Formattings $LocationLabelFormatting
-    $LocationLabel.text = "Target Location"
+    $LocationLabel.text = 'Target Location'
     $LocationLabel.AutoSize = $true
-    $LocationLabel.Tag = "Select the Disaster Recovery (DR) location."
+    $LocationLabel.Tag = 'Select the Disaster Recovery (DR) location.'
     $LocationLabel.Add_MouseHover({Show-Help})
 
-    $LoadingLabelFormatting = @{"location"=@(150, 535); "width"=25; "height"=10}
+    $LoadingLabelFormatting = @{'location' = @(150, 535); 'width' = 25; 'height' = 10}
     Add-CommonFormatting -UiObject $LoadingLabel -Formattings $LoadingLabelFormatting
-    $LoadingLabel.text = ""
+    $LoadingLabel.text = ''
     $LoadingLabel.AutoSize = $true
     $LoadingLabel.Enabled = $true
     $LoadingLabel.Add_MouseHover({Show-Help})
 
-    $SelectButtonFormatting = @{"location"=@(184, 580); "width"=75; "height"=30}
+    $SelectButtonFormatting = @{'location' = @(184, 580); 'width' = 75; 'height' = 30}
     Add-CommonFormatting -UiObject $SelectButton -Formattings $SelectButtonFormatting
-    $SelectButton.BackColor = "#eeeeee"
-    $SelectButton.text = "Select"
+    $SelectButton.BackColor = '#eeeeee'
+    $SelectButton.text = 'Select'
     $SelectButton.Add_Click({Get-AllSelections})
 
     $MsLogo = New-Object System.Windows.Forms.PictureBox
     $MsLogo.width = 140 * $WidthRatio
     $MsLogo.height = 80 * $HeightRatio
     $MsLogo.location = New-Object System.Drawing.Point($(150 * $WidthRatio), $(10 * $HeightRatio))
-    $MsLogo.imageLocation = "https://c.s-microsoft.com/en-us/CMSImages/ImgOne.jpg?version=D418E733-821C-244F-37F9-DC865BDEFEC0"
+    $MsLogo.imageLocation = 'https://c.s-microsoft.com/en-us/CMSImages/ImgOne.jpg?version=D418E733-821C-244F-37F9-DC865BDEFEC0'
     $MsLogo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::zoom
 
     # Populating the subscription dropdown and launching the form
@@ -1018,7 +1028,7 @@ function Generate-UserInterface
 
     $Longest = ($SubscriptionArray | Sort-Object Length -Descending)[0]
     $SubscriptionDropDown.DropDownWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($Longest, `
-        $SubscriptionDropDown.Font).Width, $SubscriptionDropDown.Width | Measure-Object -Maximum).Maximum
+                $SubscriptionDropDown.Font).Width, $SubscriptionDropDown.Width | Measure-Object -Maximum).Maximum
 
     $UserInputForm.controls.AddRange($FormElements.Values + $LoadingLabel)
     $UserInputForm.controls.AddRange($MsLogo)
@@ -1041,23 +1051,26 @@ function Encrypt-Secret(
 {
     $Body = @{
         'value' = $DecryptedValue
-        'alg'   = $EncryptedAlgorithm}
+        'alg'   = $EncryptedAlgorithm
+    }
 
     $BodyJson = ConvertTo-Json -InputObject $Body
 
     $Params = @{
         ContentType = [ConstantStrings]::contentType
         Headers     = @{
-            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
+            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + ' ' + $AccessToken
+        }
         Method      = [ConstantStrings]::httpPost
         URI         = "$KeyId" + '/encrypt?api-version=7.1'
-        Body        = $BodyJson}
+        Body        = $BodyJson
+    }
 
     try
     {
         $OutputLogger.Log(
             $MyInvocation,
-            "Starting REST call - " + $Params.URI,
+            'Starting REST call - ' + $Params.URI,
             [LogType]::INFO)
         $Response = Invoke-RestMethod @Params
     }
@@ -1092,23 +1105,26 @@ function Decrypt-Secret(
 {
     $Body = @{
         'value' = $EncryptedValue
-        'alg'   = $EncryptedAlgorithm}
+        'alg'   = $EncryptedAlgorithm
+    }
 
     $BodyJson = ConvertTo-Json -InputObject $Body
 
     $Params = @{
         ContentType = [ConstantStrings]::contentType
         Headers     = @{
-            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + " " + $AccessToken }
+            [ConstantStrings]::authHeader = [ConstantStrings]::tokenType + ' ' + $AccessToken
+        }
         Method      = [ConstantStrings]::httpPost
         URI         = "$KeyId" + '/decrypt?api-version=7.1'
-        Body        = $BodyJson}
+        Body        = $BodyJson
+    }
 
     try
     {
         $OutputLogger.Log(
             $MyInvocation,
-            "Starting REST call - " + $Params.URI,
+            'Starting REST call - ' + $Params.URI,
             [LogType]::INFO)
         $Response = Invoke-RestMethod @Params
     }
@@ -1151,7 +1167,7 @@ function Extract-LabelledTokensFromId([string] $armId)
 
     $labelledTokens = [System.Collections.Hashtable]::New()
 
-    for ($index=0; $index -lt $tokens.Count; $index += 2)
+    for ($index = 0; $index -lt $tokens.Count; $index += 2)
     {
         $labelledTokens.Add($tokens[$index], $tokens[$index + 1])
     }
@@ -1297,25 +1313,26 @@ function Get-ResourceLinks(
     [string] $filterByTargetType)
 {
     Write-Host -ForegroundColor Green "Fetching resource links under '$resourceGroupName'" `
-        "resource group..."
+        'resource group...'
 
     $context = Get-AzContext
     $token = Get-AzAccessToken -ResourceTypeName Arm
     $url = Get-UrlString -ApiVersion $([ConstantStrings]::resourceLinksApiVersion) -Tokens `
-        @(
-            [ConstantStrings]::subscriptions,
-            $context.Subscription.Id,
-            [ConstantStrings]::resourceGroups,
-            $resourceGroupName,
-            [ConstantStrings]::providers,
-            [ConstantStrings]::resourcesProvider,
-            [ConstantStrings]::resourceLinks
-        )
+    @(
+        [ConstantStrings]::subscriptions,
+        $context.Subscription.Id,
+        [ConstantStrings]::resourceGroups,
+        $resourceGroupName,
+        [ConstantStrings]::providers,
+        [ConstantStrings]::resourcesProvider,
+        [ConstantStrings]::resourceLinks
+    )
 
     $params = @{
         ContentType = [ConstantStrings]::contentType
         Headers     = @{
-            [ConstantStrings]::authHeader = "Bearer $($token.Token)"}
+            [ConstantStrings]::authHeader = "Bearer $($token.Token)"
+        }
         Method      = [ConstantStrings]::httpGet
         URI         = $url
     }
@@ -1338,7 +1355,7 @@ function Get-ResourceLinks(
     if (-not [string]::IsNullOrEmpty($filterBySourceType))
     {
         $properties = $properties | `
-            Where-Object {
+                Where-Object {
                 $(Extract-ResourceTypeFromId -ArmId $_.SourceId) -like $filterBySourceType
             }
     }
@@ -1346,7 +1363,7 @@ function Get-ResourceLinks(
     if (-not [string]::IsNullOrEmpty($filterByTargetType))
     {
         $properties = $properties | `
-            Where-Object {
+                Where-Object {
                 $(Extract-ResourceTypeFromId -ArmId $_.TargetId) -like $filterByTargetType
             }
     }
@@ -1361,7 +1378,8 @@ function Get-ResourceLinks(
 ### <param name="VmArray">Gets the list of VM names.</param>
 ### <param name="SourceResourceGroupName">Gets the source resource group name.</param>
 ### <return>List of source information objects.</return>
-function New-Sources {
+function New-Sources
+{
     param (
         [string[]] $VmArray,
         [string] $SourceResourceGroupName
@@ -1369,7 +1387,7 @@ function New-Sources {
 
     $SourceList = @()
 
-    foreach($VmName in $VmArray)
+    foreach ($VmName in $VmArray)
     {
         $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName
 
@@ -1384,12 +1402,12 @@ function New-Sources {
             $Vm = Get-AzVm -ResourceGroupName $SourceResourceGroupName -Name $VmName -Status
             $Disks = $Vm.Disks
 
-            for($i=0; $i -lt $Disks.Count; $i++)
+            for ($i = 0; $i -lt $Disks.Count; $i++)
             {
                 $Disk = $Disks[$i]
                 $Source = [Source]::new($VmName, $Disk.Name)
 
-                if($null -ne $Disks[$i].EncryptionSettings)
+                if ($null -ne $Disks[$i].EncryptionSettings)
                 {
                     $Source.Bek = $Disk.EncryptionSettings[0].DiskEncryptionKey
                     $Source.Kek = $Disk.EncryptionSettings[0].KeyEncryptionKey
@@ -1415,7 +1433,7 @@ function New-Sources {
                 [LogType]::INFO)
 
             # Passing null string inorder to differentiate between 1-pass and 2-pass from the logs
-            $Source = [Source]::new($VmName, "")
+            $Source = [Source]::new($VmName, '')
 
             $Source.Bek = $Vm.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey
             $Source.Kek = $Vm.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey
@@ -1445,7 +1463,7 @@ function Copy-AccessPolicies(
     foreach ($AccessPolicy in $SourceAccessPolicies)
     {
         $SetPolicyCommand = "Set-AzKeyVaultAccessPolicy -VaultName $TargetKeyVaultName" + `
-        " -ResourceGroupName $TargetResourceGroupName -ObjectId $($AccessPolicy.ObjectId)" + ' '
+            " -ResourceGroupName $TargetResourceGroupName -ObjectId $($AccessPolicy.ObjectId)" + ' '
 
         if ($AccessPolicy.Permissions.Keys)
         {
@@ -1519,17 +1537,17 @@ function Compare-Permissions(
                 "Access policy for $UserId",
                 [LogType]::INFO)
 
-            if($ResourceObject)
+            if ($ResourceObject)
             {
                 $Permissions = $Policy.Permissions.Keys
 
-                if($Secret)
+                if ($Secret)
                 {
                     $Permissions = $Policy.Permissions.Secrets
-                    $PermissionsType = "secrets"
+                    $PermissionsType = 'secrets'
                 }
 
-                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object {$_.ToLower()}
 
                 if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
@@ -1543,13 +1561,13 @@ function Compare-Permissions(
             {
                 $Permissions = $Policy.PermissionsToKeys
 
-                if($Secret)
+                if ($Secret)
                 {
                     $Permissions = $Policy.PermissionsToSecrets
-                    $PermissionsType = "secrets"
+                    $PermissionsType = 'secrets'
                 }
 
-                $Permissions = $Permissions | ForEach-Object{$_.ToLower()}
+                $Permissions = $Permissions | ForEach-Object {$_.ToLower()}
 
                 if (-not $Permissions -or (($PermissionsRequired | ForEach-Object { $Permissions.Contains($_)}) -contains $false))
                 {
@@ -1607,7 +1625,7 @@ function Conduct-TargetKeyVaultPreReq(
             [LogType]::OUTPUT)
 
         $KeyVaultResource = Get-AzResource -ResourceId $EncryptionKey.SourceVault.Id
-        $TargetResourceGroupName = "$($KeyVaultResource.ResourceGroupName)" + "-asr"
+        $TargetResourceGroupName = "$($KeyVaultResource.ResourceGroupName)" + '-asr'
 
         try
         {
@@ -1639,11 +1657,11 @@ function Conduct-TargetKeyVaultPreReq(
     else
     {
         # Check only when existing BEK key vault or existing KEK key vault different from secret key vault.
-        if($Secret -or (-not $IsBekKeyVaultNew) -or ($TargetBekVault -ne $TargetKeyVaultName))
+        if ($Secret -or (-not $IsBekKeyVaultNew) -or ($TargetBekVault -ne $TargetKeyVaultName))
         {
             # Checking whether user has required permissions to the Target Key vault
             Compare-Permissions -KeyVaultName $TargetKeyVault.VaultName -PermissionsRequired $TargetPermissions `
-            -AccessPolicies $TargetKeyVault.AccessPolicies
+                -AccessPolicies $TargetKeyVault.AccessPolicies
         }
     }
 }
@@ -1712,7 +1730,7 @@ function Add-ResourceMoverMSIAccessPolicy(
         $OutputLogger.Log(
             $MyInvocation,
             "Move collection- $($MoveCollection.Name), has no MSI assigned." + `
-            "Identity type - $($MoveCollection.IdentityType).",
+                "Identity type - $($MoveCollection.IdentityType).",
             [LogType]::OUTPUT)
         return
     }
@@ -1720,7 +1738,7 @@ function Add-ResourceMoverMSIAccessPolicy(
     $OutputLogger.Log(
         $MyInvocation,
         "Giving move collection- $($MoveCollection.Name), access to BEK vault - " + `
-        "$($TargetBekVaultName). Adding access policy for - $($MoveCollection.IdentityPrincipalId)",
+            "$($TargetBekVaultName). Adding access policy for - $($MoveCollection.IdentityPrincipalId)",
         [LogType]::OUTPUT)
 
     $ObjectId = $MoveCollection.IdentityPrincipalId
@@ -1733,7 +1751,7 @@ function Add-ResourceMoverMSIAccessPolicy(
         $OutputLogger.Log(
             $MyInvocation,
             "Giving move collection- $($MoveCollection.Name), access to KEK vault - " + `
-            "$($TargetKekVaultName). Adding access policy for - $ObjectId",
+                "$($TargetKekVaultName). Adding access policy for - $ObjectId",
             [LogType]::OUTPUT)
 
         Set-AzKeyVaultAccessPolicy -VaultName $TargetKekVaultName -ObjectId $ObjectId `
@@ -1750,24 +1768,24 @@ function Start-CopyKeys
     $Context = Get-AzContext
     $Subscriptions = Get-AzSubscription -ErrorAction SilentlyContinue
 
-    if($null -eq $Context -or $null -eq $Subscriptions)
+    if ($null -eq $Context -or $null -eq $Subscriptions)
     {
         $SuppressOutput = Login-AzAccount -ErrorAction Stop
     }
 
     $CompletedList = @()
     $UserInputs = New-Object System.Collections.Hashtable
-    Write-Verbose "Starting user interface to get inputs"
+    Write-Verbose 'Starting user interface to get inputs'
     Generate-UserInterface
 
-    $ResourceGroupName = $UserInputs["ResourceGroupName"]
-    $VmNameArray = $UserInputs["VmNameArray"]
-    $TargetLocation = $UserInputs["TargetLocation"]
-    $TargetBekVault = $UserInputs["TargetBekVault"]
-    $TargetKekVault = $UserInputs["TargetKekVault"]
+    $ResourceGroupName = $UserInputs['ResourceGroupName']
+    $VmNameArray = $UserInputs['VmNameArray']
+    $TargetLocation = $UserInputs['TargetLocation']
+    $TargetBekVault = $UserInputs['TargetBekVault']
+    $TargetKekVault = $UserInputs['TargetKekVault']
 
 
-    if($null -eq $Context)
+    if ($null -eq $Context)
     {
         $Context = Get-AzContext
     }
@@ -1779,7 +1797,7 @@ function Start-CopyKeys
     $OutputLogger.LogObject(
         $MyInvocation,
         $UserInputs,
-        "User inputs.",
+        'User inputs.',
         [LogType]::INFO)
 
     $TenantId = $Context.Tenant.Id
@@ -1798,7 +1816,7 @@ function Start-CopyKeys
 
     $SourceList = New-Sources -VmArray $VmNameArray -SourceResourceGroupName $ResourceGroupName
 
-    foreach($Source in $SourceList)
+    foreach ($Source in $SourceList)
     {
         try
         {
@@ -1806,13 +1824,13 @@ function Start-CopyKeys
 
             # Only VMName as source name if 2 pass else VMName - DiskName
             $SourceName = if ([string]::IsNullOrEmpty($Source.DiskName)) { $Source.Name } else `
-                { $Source.Name + " - " + $Source.DiskName }
+            { $Source.Name + ' - ' + $Source.DiskName }
 
             # If output diskName is empty -> 2-pass else 1-pass
             $OutputLogger.LogObject(
                 $MyInvocation,
                 $Source,
-                "Source information.",
+                'Source information.',
                 [LogType]::INFO)
 
             $Bek = $Source.Bek
@@ -1851,13 +1869,13 @@ function Start-CopyKeys
             # Getting the BEK secret value text.
             [uri]$Url = $Bek.SecretUrl
             $BekSecret = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
-                -Name $Url.Segments[2].TrimEnd("/")
+                -Name $Url.Segments[2].TrimEnd('/')
             $BekSecretBase64 = $BekSecret.SecretValueText
 
             if ([string]::IsNullOrEmpty($BekSecretBase64))
             {
                 $BekSecretBase64 = Get-AzKeyVaultSecret -VaultName $BekKeyVaultResource.Name -Version $Url.Segments[3] `
-                -Name $Url.Segments[2].TrimEnd("/") -AsPlainText
+                    -Name $Url.Segments[2].TrimEnd('/') -AsPlainText
             }
 
             $BekTags = $BekSecret.Attributes.Tags
@@ -1901,12 +1919,12 @@ function Start-CopyKeys
 
                 [uri]$Url = $Kek.KeyUrl
                 $KekKey = Get-AzKeyVaultKey -VaultName $KekKeyVaultResource.Name -Version $Url.Segments[3] `
-                    -Name $Url.Segments[2].TrimEnd("/")
+                    -Name $Url.Segments[2].TrimEnd('/')
 
-                if(-not $Kekkey)
+                if (-not $Kekkey)
                 {
                     throw [Errors]::KeyMissing(
-                        $Url.Segments[2].TrimEnd("/"),
+                        $Url.Segments[2].TrimEnd('/'),
                         $Url.Segments[3],
                         $KekKeyVaultResource.Name)
                 }
@@ -1952,11 +1970,11 @@ function Start-CopyKeys
                     $BekEncryptionAlgorithm -AccessToken $AccessToken -KeyId $NewKekKey.Key.Kid
 
                 $BekTags.DiskEncryptionKeyEncryptionKeyURL = $NewKekKey.Key.Kid
-                Create-Secret -Secret $EncryptedSecret.value -ContentType "Wrapped BEK"
+                Create-Secret -Secret $EncryptedSecret.value -ContentType 'Wrapped BEK'
             }
             else
             {
-                Create-Secret -Secret $BekSecretBase64 -ContentType "BEK"
+                Create-Secret -Secret $BekSecretBase64 -ContentType 'BEK'
             }
 
             $CompletedList += $SourceName
@@ -1976,7 +1994,7 @@ function Start-CopyKeys
             [LogType]::INFO)
 
         # Copying access policies to new KEK target key vault
-        $TargetKekRgName = "$($FirstKekVault.ResourceGroupName)" + "-asr"
+        $TargetKekRgName = "$($FirstKekVault.ResourceGroupName)" + '-asr'
         Copy-AccessPolicies -TargetKeyVaultName $TargetKekVault -TargetResourceGroupName $TargetKekRgName `
             -SourceKeyVaultName $FirstKekVault.Name -SourceAccessPolicies `
             $FirstKekVault.Properties.AccessPolicies
@@ -1990,7 +2008,7 @@ function Start-CopyKeys
             [LogType]::INFO)
 
         # Copying access policies to new BEK target key vault
-        $TargetBekRgName = "$($FirstBekVault.ResourceGroupName)" + "-asr"
+        $TargetBekRgName = "$($FirstBekVault.ResourceGroupName)" + '-asr'
         Copy-AccessPolicies -TargetKeyVaultName $TargetBekVault -TargetResourceGroupName $TargetBekRgName `
             -SourceKeyVaultName $FirstBekVault.Name -SourceAccessPolicies `
             $FirstBekVault.Properties.AccessPolicies
@@ -2000,12 +2018,12 @@ function Start-CopyKeys
     {
         $ResourceLinks = Get-ResourceLinks -ResourceGroupName $ResourceGroupName `
             -FilterBySourceType $([ConstantStrings]::vmType) -filterByTargetType `
-            $([ConstantStrings]::moveResourceType)
+        $([ConstantStrings]::moveResourceType)
 
         if ($null -eq $ResourceLinks)
         {
-            $message = "None of the VMs are in any Move Collection. Skipping Resource Mover " + `
-                "MSI access checks."
+            $message = 'None of the VMs are in any Move Collection. Skipping Resource Mover ' + `
+                'MSI access checks.'
 
             Write-Warning $message
             $OutputLogger.Log(
@@ -2020,21 +2038,21 @@ function Start-CopyKeys
 
             $SuppressOutput = $ResourceLinks | ForEach-Object { `
                     $VmMCDict.Add(
-                        $(Extract-ResourceNameFromId -armId $_.sourceId),
-                        $_.targetid)
-                    $MoveResourcesList.Add($_.targetid)}
+                    $(Extract-ResourceNameFromId -armId $_.sourceId),
+                    $_.targetid)
+                $MoveResourcesList.Add($_.targetid)}
 
             $OutputLogger.LogObject(
                 $MyInvocation,
                 $VmMCDict,
-                "Move collections -",
+                'Move collections -',
                 [LogType]::INFO)
 
             foreach ($Id in $MoveResourcesList)
             {
                 $MoveCollection = Get-AzResourceMoverMoveCollection -Name `
-                    $(Extract-ParentResourceNameFromId -armId $Id) -ResourceGroupName `
-                    $(Extract-ResourceGroupFromId -armId $Id)
+                $(Extract-ParentResourceNameFromId -armId $Id) -ResourceGroupName `
+                $(Extract-ResourceGroupFromId -armId $Id)
 
                 $SuppressOutput = Add-ResourceMoverMSIAccessPolicy -MoveCollection $MoveCollection `
                     -TargetBekVaultName $TargetBekVault -TargetKekVaultName $TargetKekVault
@@ -2045,8 +2063,8 @@ function Start-CopyKeys
     return $CompletedList
 }
 
-$ErrorActionPreference = "Stop"
-$DebugPreference = "SilentlyContinue"
+$ErrorActionPreference = 'Stop'
+$DebugPreference = 'SilentlyContinue'
 $SourceSecretsPermissions = @('get')
 $TargetSecretsPermissions = @('set')
 $SourceKeysPermissions = @('get', 'decrypt')
@@ -2073,13 +2091,13 @@ catch
     $OutputLogger.LogObject(
         $MyInvocation,
         $PSItem,
-        "Unknown error",
+        'Unknown error',
         [LogType]::ERROR)
 }
 finally
 {
     # Summarizes the CopyKeys status for various Vms
-    if($CompletedList.Count -gt 0)
+    if ($CompletedList.Count -gt 0)
     {
         $OutputLogger.Log(
             $MyInvocation,
